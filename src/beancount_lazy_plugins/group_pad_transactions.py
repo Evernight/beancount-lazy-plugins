@@ -1,10 +1,11 @@
 """
-A Beancount plugin that allows to specify total investment account value over 
-time and creates an underlying fictional commodity which price is set up to 
-match total value of the account over time.
+This plugin improves treatment of pad/balance operations, in partucular  if you use them following
+this guide: https://lazy-beancount.xyz/docs/stage1_totals/explanation/
 
-All incoming and outcoming transactions in and from account are converted into
-transactions buying and selling this commodity at calculated price at the date.
+If you have multiple currencies in the single account, multiple pad transactions will be generated.
+However, if some of these correspond to currency conversions that you don't specify explicitly
+(and I think that's way too much hassle), the groups of pad operations may create too much noise when
+you look at transaction journal and tables. This plugin combines these groups into a single transaction.
 """
 
 import collections
