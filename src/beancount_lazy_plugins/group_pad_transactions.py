@@ -51,8 +51,6 @@ def group_pad_transactions(entries, options_map, config_str=None):
             links=set(),
             postings=list(chain(*[e.postings for e in entries]))
         )
-        print(transaction)
-        print('\n')
         result.append(transaction)
 
     return result, []
