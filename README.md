@@ -5,9 +5,9 @@ A repository containing set of plugins used by https://github.com/Evernight/lazy
 ```pip3 install git+https://github.com/Evernight/beancount-lazy-plugins```
 
 ## Plugins
-* [valuation](#valuation)
-* [filter_map](#filter_map)
-* [group_pad_transactions](#group_pad_transactions)
+* [valuation](#valuation): track total value of the opaque fund ovre time
+* [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
+* [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
@@ -145,7 +145,7 @@ Similar to ```pushtag```/```poptag``` operations but much more flexible and, bes
 Can be used in combination with the [beancount_interpolate](https://github.com/Akuukis/beancount_interpolate) plugin (see Split plugin in particular).
 
 ## group_pad_transactions
-This plugin improves treatment of pad/balance operations, in partucular  if you use them following
+This plugin improves treatment of pad/balance operations, in partucular if you use them following
 this guide: https://lazy-beancount.xyz/docs/stage1_totals/explanation/
 
 If you have multiple currencies in the single account, multiple pad transactions will be generated.
