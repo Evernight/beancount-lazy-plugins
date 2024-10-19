@@ -5,7 +5,7 @@ Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beanco
 ```pip3 install git+https://github.com/Evernight/beancount-lazy-plugins```
 
 ## Plugins
-* [valuation](#valuation): track total value of the opaque fund ovre time
+* [valuation](#valuation): track total value of the opaque fund over time
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 
@@ -20,7 +20,7 @@ Enable plugin in the ledger
     plugin "beancount_lazy_plugins.valuation"
 
 Then using a set of ```1970-01-01 custom "valuation" "config"``` commands configure accounts with the opaque funds with following arguments:
-1. Accouny name
+1. Account name
 2. The corresponding commodity name. These don't really matter and are just for your own reference.
 3. A PnL (profits and losses) account that will be used to track realized gains and losses.
 
