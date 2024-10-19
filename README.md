@@ -1,5 +1,5 @@
 # beancount-lazy-plugins
-A repository containing set of plugins used by https://github.com/Evernight/lazy-beancount (that can certainly be used and be useful separately).
+Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beancount) (but can also be useful on their own).
 
 ## Installation
 ```pip3 install git+https://github.com/Evernight/beancount-lazy-plugins```
