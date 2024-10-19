@@ -1,13 +1,13 @@
 # beancount-lazy-plugins
 A repository containing set of plugins used by https://github.com/Evernight/lazy-beancount (that can certainly be used and be useful separately).
 
-Plugins: 
-* [valuation](#valuation)
-* [filter_map](#filter-map)
-* [group_pad_transactions](#group_pad_transactions)
-
 ## Installation
 ```pip3 install git+https://github.com/Evernight/beancount-lazy-plugins```
+
+## Plugins
+* [valuation](#valuation)
+* [filter_map](#filter_map)
+* [group_pad_transactions](#group_pad_transactions)
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
@@ -132,7 +132,7 @@ Besides adding a tag, add a clarifying comment.
     addTags: "#trip-country1-24 #travel"
 ```
 
-Similar could be achieved by ```pushtag```/```poptag``` but it's uch less flexible and, besides, this plugin will work alongside all included files and not depend on order of how transactions are defined. Again, useful in combination with ```fava-dashboards```.
+Similar to ```pushtag```/```poptag``` operations but much more flexible and, besides, will work alongside all included files and independently of the order in which transactions are defined. Again, useful in combination with ```fava-dashboards``` (and [lazy-beancount](https://github.com/Evernight/lazy-beancount) with slightly modified dashboard configs).
 
 ### Example 4: advanced usage
 ```
@@ -153,7 +153,7 @@ However, if some of these correspond to currency conversions that you don't spec
 (and I think that's way too much hassle), the groups of pad operations may create too much noise when
 you look at transaction journal and tables. This plugin combines these groups into a single transaction.
 
-Enable processing pad+balance operations explicitly in the beginning of the ledger:
+Enable processing ```pad``` and ```balance``` operations explicitly in the beginning of the ledger:
 ```
 option "plugin_processing_mode" "raw"
 ```
