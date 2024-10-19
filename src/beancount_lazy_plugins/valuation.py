@@ -16,13 +16,12 @@ from beancount.core.data import Amount
 from beancount.core.data import Posting
 from beancount.core.data import Commodity
 from beancount.core.data import Balance
-from beancount.core.position import CostSpec
-from beancount.core.number import MISSING
 import decimal
 from decimal import Decimal
 
 # Note: do not use from beancount.parser import booking !
-# There's a non-obvious
+# There's a non-obvious bug while working with the beancount-import library:
+# see "intercept_book" function
 from beancount.parser import booking_full
 
 def round_down(value, decimals):
@@ -54,19 +53,19 @@ def valuation(entries, options_map, config_str=None):
     new_entries = []
     modified_transactions = []
 
+    account_mapping = {}
+    # read config
+    for entry in entries:
+        if isinstance(entry, Custom) and entry.type == 'valuation' and entry.values[0].value == 'config':
+            account_mapping[entry.meta['account']] = (entry.meta['currency'], entry.meta['pnlAccount'])
+
     # We'll track balances of the relevant accounts here
     balances = collections.defaultdict(Decimal)
     # and will keep the last calculated price
     last_price = {}
 
     for entry in entries:
-        if isinstance(entry, Custom) and entry.type == 'valuation-config':
-            config_str = entry.values[0].value.strip()
-            if config_str and config_str:
-                account_mapping = eval(config_str, {}, {})
-                if not isinstance(account_mapping, dict):
-                    raise RuntimeError("Invalid configuration")
-        elif isinstance(entry, Transaction):
+        if isinstance(entry, Transaction):
             transaction_modified = False
 
             # Replace postings if the account is in the plugin configuration
@@ -76,7 +75,16 @@ def valuation(entries, options_map, config_str=None):
                     transaction_modified = True
                     mapped_currency, pnl_account = account_mapping[posting.account]
 
-                    last_valuation_price = last_price.get(mapped_currency, Decimal(1.0))
+                    if mapped_currency in last_price:
+                        last_valuation_price = last_price[mapped_currency]
+                    else:
+                        # There was no valuation operation before, set default mapped curency to equal value as currency
+                        last_valuation_price = Decimal(1.0)
+                        price = Price(
+                            entry.meta, entry.date, mapped_currency,
+                            Amount(Decimal(1.0), posting.units.currency)
+                        )
+                        prices.append(price)
                     total_in_mapped_currency = posting.units.number / last_valuation_price
 
                     if posting.units.number > 0:
@@ -84,15 +92,17 @@ def valuation(entries, options_map, config_str=None):
                         modified_posting = Posting(
                             posting.account,
                             Amount(round_up(total_in_mapped_currency, MAPPED_CURRENCY_PRECISION), mapped_currency), 
-                            cost=CostSpec(last_valuation_price, None, posting.units.currency, entry.date, None, False),
-                            price=None,
+                            cost=None,
+                            price=Amount(last_valuation_price, posting.units.currency), 
                             flag=posting.flag,
                             meta=posting.meta)
                     else:
+                        # Cash out-flow, "sell" underlying currency
                         modified_posting = Posting(
                             posting.account,
                             Amount(round_down(total_in_mapped_currency, MAPPED_CURRENCY_PRECISION), mapped_currency), 
-                            cost=CostSpec(MISSING, None, posting.units.currency, None, None, False),
+                            # cost=CostSpec(MISSING, None, posting.units.currency, None, None, False),
+                            cost=None,
                             price=Amount(last_valuation_price, posting.units.currency),
                             flag=posting.flag,
                             meta=posting.meta)
@@ -156,13 +166,13 @@ def valuation(entries, options_map, config_str=None):
             
             price = Price(
                 entry.meta, entry.date, mapped_currency,
-                Amount(Decimal(1.0), valuation_amount.currency)
+                Amount(Decimal(1.0), entry.amount.currency)
             )
             last_price[mapped_currency] = Decimal(1.0)
             balances[entry.account] = entry.amount.number
 
             prices.append(price)
-        elif isinstance(entry, Custom) and entry.type == 'valuation':
+        elif isinstance(entry, Custom) and entry.type == 'valuation' and entry.values[0].value != 'config':
             account, valuation_amount = entry.values
             account = account.value
 
@@ -195,7 +205,8 @@ def valuation(entries, options_map, config_str=None):
           commodities.append(commodity)
 
     # Call booking.book to automatically fill unspecified cost values for out-flows
-    # TODO: if it's not called, MISSING values trigger error. Would it be possible to avoid these calls?
+    # If it's not called, MISSING values or other absent values trigger error. 
+    # TODO: Would it be possible to avoid these calls?
     booking_methods = collections.defaultdict(lambda: options_map["booking_method"])
     cost_processed_transactions, cost_processed_errors = booking_full.book(
         modified_transactions, options_map, booking_methods)
