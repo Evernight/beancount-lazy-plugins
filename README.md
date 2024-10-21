@@ -92,18 +92,23 @@ transactions in/out of the account.
     ; Account is at 0 again now
 
 ## filter_map
-A plugin that allows to apply operations to group of transactions. You can filter by selectors (taken from Fava's selectors and using the same code) and apply tag or add metadata to the transaction. Considering that metadata can later be used by other plugins that allows a lot of flexibility of the possible usage
+A plugin that allows to apply operations to group of transactions. You can filter by set of parameters (taken from [Fava's filters](https://lazy-beancount.xyz/docs/stage2_expenses/advanced_fava/#filters), plugin is using the same code) and apply tag or add metadata to the transaction. Considering that tags and metadata can later be used by other plugins, it allows a lot of flexibility in the potential usage.
 
 ### Syntax
 ```
 2021-01-01 custom "filter-map" "apply"
-    time: "2024-01-09 to 2024-02-15" ; same as Fava's time filter
-    account: "Expenses:Bills" ; same as Fava's account
-    filter: "payee:'Company ABCDE' -any(account:'Expenses:Taxes')" ; same as Fava's advanced filter field
-    addTags: "tag1 tag2 #tag3" ; space-separated list of tags to add (# is optional) to selected transactions
-    addMeta: "{'comment': 'Transaction description'}" ; any dictionary of the metadata to add/alter selected transactions
+    ; following three arguments correspond to Fava's filters:
+    ; time, account and advanced filter (as ordered left to right in the UI)
+    time: "2024-01-09 to 2024-02-15"
+    account: "Expenses:Bills"
+    filter: "payee:'Company ABCDE' -any(account:'Expenses:Taxes')"
+    ; the following arguments specify operations to apply to selected transactions
+    ; space-separated list of tags to add (# is optional) to selected transactions
+    addTags: "tag1 tag2 #tag3"
+    ; any dictionary of the metadata to add/alter selected transactions
+    addMeta: "{'comment': 'Transaction description'}" 
 ```
-Operation date is arbitrary and not being used by the plugin
+Beancount entry date can be arbitrary and is not being used by the plugin.
 
 ### Example 1: adding tag to all transactions related to certain account
 ```
