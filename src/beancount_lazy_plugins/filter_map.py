@@ -41,7 +41,7 @@ __plugins__ = ['filter_map']
 def matches_filter(entry,
     filter):
     if isinstance(filter, TimeFilter):
-        return entry.date >= filter.date_range.begin and entry.date <= filter.date_range.end
+        return entry.date >= filter.date_range.begin and entry.date < filter.date_range.end
     else:
         return len(filter.apply([entry])) > 0
 
