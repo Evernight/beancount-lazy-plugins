@@ -149,6 +149,20 @@ Similar to ```pushtag```/```poptag``` operations but much more flexible and, bes
 
 Can be used in combination with the [beancount_interpolate](https://github.com/Akuukis/beancount_interpolate) plugin (see Split plugin in particular).
 
+### Example 5: presets
+```
+2021-01-01 custom "filter-map" "preset"
+    name: "trip"
+    filter: "-#not-travel -#recurring -any(account:'Expenses:Taxes') -any(account:'Expenses:Unattributed')"
+
+2021-01-01 custom "filter-map" "apply"
+    preset: "trip"
+    time: "2024-03-15 to 2024-03-22"
+    addTags: "#trip-somewhere-24 #travel"
+```
+
+Let's consider example 3 again. For each trip you want to describe it's likely that the filter field is going to be the same. To avoid repeating it for all trips you can save it (or any combination of fields, really) to reuse as a preset in other filters. 
+
 ## group_pad_transactions
 This plugin improves treatment of pad/balance operations, in partucular if you use them following
 this guide: https://lazy-beancount.xyz/docs/stage1_totals/explanation/
