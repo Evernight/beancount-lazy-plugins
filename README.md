@@ -137,7 +137,7 @@ Besides adding a tag, add a clarifying comment.
     addTags: "#trip-country1-24 #travel"
 ```
 
-Similar to ```pushtag```/```poptag``` operations but much more flexible and, besides, will work alongside all included files and independently of the order in which transactions are defined. Again, useful in combination with ```fava-dashboards``` (and [lazy-beancount](https://github.com/Evernight/lazy-beancount) with slightly modified dashboard configs).
+Similar to ```pushtag```/```poptag``` operations but much more flexible and, besides, will work alongside all included files and independently of the order in which transactions are defined. Again, useful in combination with [fava-dashboards](https://github.com/andreasgerstmayr/fava-dashboards) (or [lazy-beancount](https://github.com/Evernight/lazy-beancount) where dashboard configs are slightly changed).
 
 ### Example 4: advanced usage
 ```
