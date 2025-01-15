@@ -44,6 +44,11 @@ def round_up(value, decimals):
 __plugins__ = ["valuation"]
 
 MAPPED_CURRENCY_PRECISION = 7
+EPSILON = 1e-9
+
+ValuationPluginError = collections.namedtuple(
+    "ValuationPluginError", "source message entry"
+)
 
 
 def valuation(entries, options_map, config_str=None):
@@ -217,9 +222,31 @@ def valuation(entries, options_map, config_str=None):
             account, valuation_amount = entry.values
             account = account.value
 
+            if account not in account_mapping:
+                plugin_errors.append(
+                    ValuationPluginError(
+                        entry.meta,
+                        "Please add account mapping configuration with currency and PnL account"
+                        + ' before using "valuation" operation. Refer to documentation and examples',
+                        entry,
+                    )
+                )
+                continue
             valuation_currency, pnl_account = account_mapping[account]
             valuation_amount = valuation_amount.value
             last_balance = balances[account]
+
+            if abs(last_balance) < EPSILON:
+                plugin_errors.append(
+                    ValuationPluginError(
+                        entry.meta,
+                        'Operation "valuation" was called on an empty account. '
+                        + "Please add some non-zero transactions into account or use pad+balance operations before"
+                        + ' the first "valuation" opeartion',
+                        entry,
+                    )
+                )
+                continue
 
             price = Price(
                 entry.meta,
