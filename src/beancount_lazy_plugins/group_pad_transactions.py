@@ -36,9 +36,9 @@ def group_pad_transactions(entries, options_map, config_str=None):
     for entry in entries:
         if isinstance(entry, Transaction) and entry.flag == "P":
             if "(Padding inserted" in entry.narration:
-                assert (
-                    len(entry.postings) == 2
-                ), "pad transactions should have two postings"
+                assert len(entry.postings) == 2, (
+                    "pad transactions should have two postings"
+                )
                 date = entry.date
                 accounts = sorted([p.account for p in entry.postings])
                 pad_transactions_by_groupping[(date, accounts[0], accounts[1])].append(

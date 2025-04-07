@@ -1,6 +1,6 @@
 """
-A Beancount plugin that allows to specify total investment account value over 
-time and creates an underlying fictional commodity which price is set up to 
+A Beancount plugin that allows to specify total investment account value over
+time and creates an underlying fictional commodity which price is set up to
 match total value of the account over time.
 
 All incoming and outcoming transactions in and from account are converted into
@@ -200,9 +200,9 @@ def valuation(entries, options_map, config_str=None):
                 new_entries.append(entry)
         elif isinstance(entry, Balance) and entry.account in account_mapping:
             mapped_currency, pnl_account = account_mapping[entry.account]
-            assert (
-                entry.account not in balances
-            ), "a single balance statement should be before any valuation assertion"
+            assert entry.account not in balances, (
+                "a single balance statement should be before any valuation assertion"
+            )
 
             price = Price(
                 entry.meta,
