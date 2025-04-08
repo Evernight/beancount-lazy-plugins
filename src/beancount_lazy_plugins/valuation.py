@@ -226,6 +226,7 @@ def valuation(entries, options_map, config_str=None):
                 modified_transactions.append(transaction)
             else:
                 new_entries.append(entry)
+
         elif isinstance(entry, Balance) and entry.account in account_mapping:
             mapped_currency, pnl_account = account_mapping[entry.account]
             assert entry.account not in balances, (
@@ -288,6 +289,9 @@ def valuation(entries, options_map, config_str=None):
 
             prices.append(price)
 
+            # Update fields for easier debugging with Fava
+            entry.meta['lastBalance'] = last_balance
+            entry.meta['calculatedPrice'] = valuation_amount.number / last_balance
             new_entries.append(entry)
         elif isinstance(entry, Commodity):
             # Just keep track of all the commodities defined in the ledger
