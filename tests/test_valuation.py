@@ -13,22 +13,27 @@ from beancount.parser import printer
 from beancount_lazy_plugins.valuation import valuation
 
 
-def test_valuation_plugin_cool_fund_example(capture_output):
-    """Test the valuation plugin with the cool_fund_example.beancount file.
-    
-    This test loads the ledger from the file and makes assertions based on the comments
-    in the file.
+@pytest.mark.parametrize(
+    "test_file,test_id",
+    [
+        pytest.param("cool_fund_example.beancount", "cool_fund", id="cool_fund"),
+        pytest.param("some_fund_example.beancount", "some_fund", id="some_fund"),
+    ],
+)
+def test_valuation_plugin(test_file, test_id, capture_output):
+    """Test the valuation plugin with different example files.
     
     Args:
+        test_file: The name of the test file to use
+        test_id: Identifier for the test case
         capture_output: If True, write the processed file to tests/data/output.
                        If False, compare the test results with the expected output.
     """
     # Define paths
     data_dir = Path("tests") / "data"
-    input_path = data_dir / "cool_fund_example.beancount"
+    input_path = data_dir / test_file
     output_dir = data_dir / "output"
-    output_path = output_dir / "cool_fund_example_output.beancount"
-    ref_path = output_dir / "cool_fund_example_output.beancount"
+    ref_path = output_dir / f"{test_id}_output.beancount"
 
     # Create output directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -38,12 +43,43 @@ def test_valuation_plugin_cool_fund_example(capture_output):
     if errors:
         pytest.fail(f"Failed to load test ledger: {errors}")
 
-    # Run the valuation plugin
-    new_entries, plugin_errors = valuation(entries, options_map)
-    if plugin_errors:
-        pytest.fail(f"Plugin errors: {plugin_errors}")
+    # No need to run the plugin as it's already run by the loader
+    # # Run the valuation plugin
+    # new_entries, plugin_errors = valuation(entries, options_map)
+    # if plugin_errors:
+    #     pytest.fail(f"Plugin errors: {plugin_errors}")
+    new_entries = entries
     
-    # Check that the plugin created the expected entries
+    # Run test-specific assertions
+    if test_id == "cool_fund":
+        assert_cool_fund_example(new_entries)
+    elif test_id == "some_fund":
+        assert_some_fund_example(new_entries)
+    
+    # Handle output based on capture_output option
+    if capture_output:
+        # Write the output to a file
+        with open(ref_path, "w") as f:
+            printer.print_entries(new_entries, file=f)
+    else:
+        # Compare with reference file if it exists
+        if ref_path.exists():
+            with open(ref_path, "r") as f:
+                expected_output = f.read()
+            
+            actual_output = None
+            # Convert new_entries to string for comparison
+            with io.StringIO() as output:
+                printer.print_entries(new_entries, file=output)
+                actual_output = output.getvalue()
+            
+            assert actual_output == expected_output, "Output does not match expected output"
+        else:
+            pytest.skip("Reference file does not exist. Run with --capture-output to create it.")
+
+
+def assert_cool_fund_example(new_entries):
+    """Assert specific conditions for the cool_fund_example.beancount test."""
     # 1. Check that the COOL_FUND_USD commodity was created
     cool_fund_commodity = None
     for entry in new_entries:
@@ -90,25 +126,8 @@ def test_valuation_plugin_cool_fund_example(capture_output):
             if posting.account == "Assets:CoolFund:Total" and posting.units.currency == "COOL_FUND_USD":
                 cool_fund_postings.append(posting)
     assert len(cool_fund_postings) > 0, "No COOL_FUND_USD postings were created"
-    
-    # Handle output based on capture_output option
-    if capture_output:
-        # Write the output to a file
-        with open(output_path, "w") as f:
-            printer.print_entries(new_entries, file=f)
-    else:
-        # Compare with reference file if it exists
-        if ref_path.exists():
-            with open(ref_path, "r") as f:
-                expected_output = f.read()
-            
-            actual_output = None
-            # Convert new_entries to string for comparison
-            with io.StringIO() as output:
-                printer.print_entries(new_entries, file=output)
-                actual_output = output.getvalue()
-            
-            assert actual_output == expected_output, "Output does not match expected output"
-        else:
-            pytest.skip("Reference file does not exist. Run with --capture-output to create it.")
+
+
+def assert_some_fund_example(new_entries):
+    pass
     

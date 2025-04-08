@@ -1,0 +1,45 @@
+1970-01-01 open Assets:Physical:Cash
+1970-01-01 open Assets:SomeFund:Total "FIFO"
+1970-01-01 open Income:SomeFund:PnL
+
+option "operating_currency" "USD"
+option "inferred_tolerance_default" "*:0.00000001"
+
+plugin "beancount_lazy_plugins.valuation"
+1970-01-01 custom "valuation" "config"
+    account: "Assets:SomeFund:Total"
+    currency: "SOME_FUND_USD"
+    pnlAccount: "Income:SomeFund:PnL"
+
+2024-01-10 * "Investing $500 in SomeFund"
+    Assets:Physical:Cash    -500 USD
+    Assets:SomeFund:Total    500 USD
+
+; SomeFund value falls, SOME_FUND_USD now worth 0.8 USD
+2024-01-11 custom "valuation" Assets:SomeFund:Total 400 USD
+
+2024-01-13 * "Investing $500 more in SomeFund"
+    Assets:Physical:Cash    -500 USD
+    Assets:SomeFund:Total    500 USD
+
+; SomeFund value now should be 900
+
+2024-02-11 custom "valuation" Assets:SomeFund:Total 1200 USD
+
+2024-02-12 * "Withdraw $300 from SomeFund"
+    Assets:Physical:Cash    400.00 USD
+    Assets:SomeFund:Total  -400.00 USD
+
+; SomeFund value now should be 800
+
+; also testing posting with price specified by @@
+2024-02-14 * "Investing $700 more in SomeFund in EUR"
+    Assets:Physical:Cash    -500 EUR
+    Assets:SomeFund:Total    700 USD @@ 500 EUR
+
+2024-03-05 custom "valuation" Assets:SomeFund:Total 1600 USD
+
+; withdraw all
+2024-03-07 * "Withdraw $1600 from SomeFund"
+    Assets:Physical:Cash    1600 USD
+    Assets:SomeFund:Total  -1600 USD 

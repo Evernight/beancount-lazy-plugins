@@ -1,0 +1,50 @@
+1970-01-01 open Assets:Physical:Cash
+1970-01-01 open Assets:SomeFund:Total                            "FIFO"
+1970-01-01 open Income:SomeFund:PnL
+
+1970-01-01 custom "valuation" "config"
+  account: "Assets:SomeFund:Total"
+  currency: "SOME_FUND_USD"
+  pnlAccount: "Income:SomeFund:PnL"
+
+2024-01-10 price SOME_FUND_USD                           1 USD
+
+2024-01-10 * "Investing $500 in SomeFund" #valuation-applied
+  Assets:Physical:Cash          -500 USD
+  Assets:SomeFund:Total  500.0000000 SOME_FUND_USD {1 USD, 2024-01-10}
+
+2024-01-11 custom "valuation" Assets:SomeFund:Total 400 USD
+
+2024-01-11 price SOME_FUND_USD                         0.8 USD
+
+2024-01-13 * "Investing $500 more in SomeFund" #valuation-applied
+  Assets:Physical:Cash          -500 USD
+  Assets:SomeFund:Total  625.0000000 SOME_FUND_USD {0.8 USD, 2024-01-13}
+
+2024-02-11 custom "valuation" Assets:SomeFund:Total 1200 USD
+
+2024-02-11 price SOME_FUND_USD          1.066666666666666666666666667 USD
+
+2024-02-12 * "Withdraw $300 from SomeFund" #valuation-applied
+  Assets:Physical:Cash         400.00 USD
+  Income:SomeFund:PnL          -25.00 USD
+  Assets:SomeFund:Total  -374.9999999 SOME_FUND_USD {1 USD, 2024-01-10} @ 1.066666666666666666666666667 USD
+
+2024-02-14 * "Investing $700 more in SomeFund in EUR" #valuation-applied
+  Assets:Physical:Cash          -500 EUR
+  Assets:SomeFund:Total          700 USD @ 0.7142857142857142857142857143 EUR
+  Assets:SomeFund:Total         -700 USD
+  Assets:SomeFund:Total  656.2500000 SOME_FUND_USD {1.066666666666666666666666667 USD, 2024-02-14}
+
+2024-03-05 custom "valuation" Assets:SomeFund:Total 1600 USD
+
+2024-03-05 price SOME_FUND_USD          1.137777777777777777777777778 USD
+
+2024-03-07 commodity SOME_FUND_USD
+
+2024-03-07 * "Withdraw $1600 from SomeFund" #valuation-applied
+  Assets:Physical:Cash            1600 USD
+  Income:SomeFund:PnL    -275.00000001 USD
+  Assets:SomeFund:Total   -125.0000001 SOME_FUND_USD {1 USD, 2024-01-10} @ 1.137777777777777777777777778 USD
+  Assets:SomeFund:Total   -625.0000000 SOME_FUND_USD {0.8 USD, 2024-01-13} @ 1.137777777777777777777777778 USD
+  Assets:SomeFund:Total   -656.2499999 SOME_FUND_USD {1.066666666666666666666666667 USD, 2024-02-14} @ 1.137777777777777777777777778 USD

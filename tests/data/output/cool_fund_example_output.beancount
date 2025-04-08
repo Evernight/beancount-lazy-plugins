@@ -1,0 +1,46 @@
+1970-01-01 open Assets:Physical:Cash
+1970-01-01 open Assets:CoolFund:Total                            "FIFO"
+1970-01-01 open Income:CoolFund:PnL
+
+
+1970-01-01 custom "valuation" "config"
+  account: "Assets:CoolFund:Total"
+  currency: "COOL_FUND_USD"
+  pnlAccount: "Income:CoolFund:PnL"
+
+2024-01-10 price COOL_FUND_USD                           1 USD
+
+2024-02-10 custom "valuation" Assets:CoolFund:Total 900 USD
+
+2024-02-10 price COOL_FUND_USD                         0.9 USD
+
+2024-03-11 custom "valuation" Assets:CoolFund:Total 1100 USD
+
+2024-03-11 price COOL_FUND_USD                         1.1 USD
+
+2024-04-11 custom "valuation" Assets:CoolFund:Total 700 USD
+
+2024-04-11 price COOL_FUND_USD          1.283333333333333333333333333 USD
+
+2024-04-15 commodity COOL_FUND_USD
+
+2024-01-10 price COOL_FUND_USD                 1 COOL_FUND_USD
+2024-02-10 price COOL_FUND_USD                         0.9 USD
+2024-03-11 price COOL_FUND_USD                         1.1 USD
+2024-04-11 price COOL_FUND_USD          1.192957746394862130535573089 USD
+
+2024-01-10 * "Investing $1k in CoolFund" #valuation-applied
+  Assets:Physical:Cash       -1000.00 USD
+  Assets:CoolFund:Total  1000.0000000 COOL_FUND_USD {1 COOL_FUND_USD, 2024-01-10}
+
+2024-03-13 * "Withdraw $500 from CoolFund" #valuation-applied
+  Assets:Physical:Cash                           500.00 USD
+  Income:CoolFund:PnL                            -45.45 USD
+  Income:CoolFund:PnL    -413.2272727272727272727272727 None @ 1.1 USD
+  Assets:CoolFund:Total                    -413.2231404 COOL_FUND_USD {1 COOL_FUND_USD, 2024-01-10} @ 1.1 COOL_FUND_USD
+
+2024-04-15 * "Withdraw $700 from CoolFund" #valuation-applied
+  Assets:Physical:Cash                           700.00 USD
+  Income:CoolFund:PnL                           -154.55 USD
+  Income:CoolFund:PnL    -425.0259740259740259740259741 None @ 1.283333333333333333333333333 USD
+  Assets:CoolFund:Total                    -457.2287216 COOL_FUND_USD {1 COOL_FUND_USD, 2024-01-10} @ 1.192957746394862130535573089 COOL_FUND_USD

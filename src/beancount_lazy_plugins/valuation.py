@@ -8,8 +8,10 @@ transactions buying and selling this commodity at calculated price at the date.
 """
 
 import collections
+import copy
 import decimal
 from decimal import Decimal
+import sys
 
 from beancount.core.data import (
     Amount,
@@ -19,13 +21,18 @@ from beancount.core.data import (
     Posting,
     Price,
     Transaction,
+    Open,
+    Booking
 )
+from beancount.core.position import CostSpec, Cost
+from beancount.core.number import MISSING
 
-# Note: do not use from beancount.parser import booking !
+from beancount.parser import printer
+
+# Note: do not use from beancount.parser import booking !!!
 # There's a non-obvious bug while working with the beancount-import library:
 # see "intercept_book" function
 from beancount.parser import booking_full
-
 
 def round_down(value, decimals):
     with decimal.localcontext() as ctx:
@@ -45,6 +52,8 @@ __plugins__ = ["valuation"]
 
 MAPPED_CURRENCY_PRECISION = 7
 EPSILON = 1e-9
+
+TAG_TO_ADD = "valuation-applied"
 
 ValuationPluginError = collections.namedtuple(
     "ValuationPluginError", "source message entry"
@@ -76,6 +85,23 @@ def valuation(entries, options_map, config_str=None):
                 entry.meta["currency"],
                 entry.meta["pnlAccount"],
             )
+
+    booking_methods = {}
+    open_account_entries = {}
+    for entry in entries:
+        if isinstance(entry, Open) and entry.account in account_mapping:
+            open_account_entries[entry.account] = entry
+    for account in account_mapping.keys():
+        if account not in open_account_entries:
+            open_account_entries[account] = Open(
+                entry.meta,
+                entry.date,
+                entry.account,
+                account_mapping[account]['currency'],
+                Booking.FIFO
+            )
+        booking_methods[account] = Booking.FIFO
+
 
     # We'll track balances of the relevant accounts here
     balances = collections.defaultdict(Decimal)
@@ -119,8 +145,8 @@ def valuation(entries, options_map, config_str=None):
                                 ),
                                 mapped_currency,
                             ),
-                            cost=Amount(last_valuation_price, posting.units.currency),
-                            price=Amount(last_valuation_price, posting.units.currency),
+                            cost=Cost(last_valuation_price, posting.units.currency, None, None),
+                            price=None,
                             flag=posting.flag,
                             meta=posting.meta,
                         )
@@ -134,8 +160,8 @@ def valuation(entries, options_map, config_str=None):
                                 ),
                                 mapped_currency,
                             ),
-                            # cost=CostSpec(MISSING, None, posting.units.currency, None, None, False),
-                            cost=None,
+                            cost=CostSpec(MISSING, None, posting.units.currency, None, None, False),
+                            # cost=None,
                             price=Amount(last_valuation_price, posting.units.currency),
                             flag=posting.flag,
                             meta=posting.meta,
@@ -184,6 +210,8 @@ def valuation(entries, options_map, config_str=None):
                     new_postings.append(posting)
 
             if transaction_modified:
+                new_tags = set(copy.deepcopy(entry.tags))
+                new_tags.add(TAG_TO_ADD)
                 # Same old transaction, updated postings
                 transaction = Transaction(
                     entry.meta,
@@ -191,7 +219,7 @@ def valuation(entries, options_map, config_str=None):
                     flag=entry.flag,
                     payee=entry.payee,
                     narration=entry.narration,
-                    tags=entry.tags,
+                    tags=new_tags,
                     links=entry.links,
                     postings=new_postings,
                 )
@@ -276,15 +304,31 @@ def valuation(entries, options_map, config_str=None):
             commodity = Commodity(entry.meta, entry.date, acc_currency)
             commodities.append(commodity)
 
+    # print('\n\nmodified_transactions')
+    # printer.print_entries(modified_transactions)
+    # sys.stdout.flush()
+
+    # print('booking_methods')
+    # print(booking_methods)
+    # sys.stdout.flush()
+
     # Call booking.book to automatically fill unspecified cost values for out-flows
     # If it's not called, MISSING values or other absent values trigger error.
     # TODO: Would it be possible to avoid these calls?
-    booking_methods = collections.defaultdict(lambda: options_map["booking_method"])
     cost_processed_transactions, cost_processed_errors = booking_full.book(
-        modified_transactions, options_map, booking_methods
+        list(open_account_entries.values()) + modified_transactions, options_map, booking_methods
     )
 
+    # print('\n\ncost_processed_transactions')
+    # printer.print_entries(cost_processed_transactions)
+    # sys.stdout.flush()
+
+    # print('\n\ncost_processed_errors')
+    # printer.print_errors(cost_processed_errors)
+    # sys.stdout.flush()
+
     return (
-        new_entries + commodities + prices + cost_processed_transactions,
+        new_entries + commodities + prices + \
+              [e for e in cost_processed_transactions if isinstance(e, Transaction)],
         plugin_errors + cost_processed_errors,
     )
