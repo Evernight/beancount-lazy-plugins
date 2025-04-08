@@ -119,7 +119,7 @@ def valuation(entries, options_map, config_str=None):
                                 ),
                                 mapped_currency,
                             ),
-                            cost=None,
+                            cost=Amount(last_valuation_price, posting.units.currency),
                             price=Amount(last_valuation_price, posting.units.currency),
                             flag=posting.flag,
                             meta=posting.meta,
