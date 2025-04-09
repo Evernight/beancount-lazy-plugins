@@ -7,11 +7,14 @@ other plugins in combination.
 """
 
 import ast
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import List, Optional, Set, Dict, Any
 
 from beancount.core.data import Custom, Transaction
 from fava.core.fava_options import FavaOptions
 from fava.core.filters import AccountFilter, AdvancedFilter, TimeFilter
+from beancount.parser.grammar import ValueType
 
 
 class OperationParams(Enum):
@@ -32,6 +35,22 @@ ALL_OPERATION_PARAMS = [
 ]
 
 __plugins__ = ["filter_map"]
+
+
+@dataclass
+class OperationConfig:
+    """Configuration for a filter-map operation."""
+    entry: Custom
+
+    time: Optional[str] = None
+    account: Optional[str] = None
+    filter: Optional[str] = None
+
+    addTags: Optional[str] = None
+    addMeta: Optional[str] = None
+    filters: List[Any] = field(default_factory=list)
+    tagValues: List[str] = field(default_factory=list)
+    times_applied: int = 0  # Track how many times this filter was applied
 
 
 def matches_filter(entry, filter):
@@ -62,38 +81,53 @@ def filter_map(entries, options_map, config_str=None):
             and entry.type == "filter-map"
             and entry.values[0].value.strip() == "apply"
         ):
-            params = {}
+            # Create a new OperationConfig instance
+            config = OperationConfig(entry=entry)
+            
+            # Apply preset if available
             if "preset" in entry.meta:
-                params = presets[entry.meta["preset"]]
+                preset_name = entry.meta["preset"]
+                preset_data = presets[preset_name]
+                for param in ALL_OPERATION_PARAMS:
+                    if param.value in preset_data:
+                        setattr(config, param.value, preset_data[param.value])
+            
+            # Apply direct parameters
             for param in ALL_OPERATION_PARAMS:
                 if param.value in entry.meta:
-                    params[param.value] = entry.meta[param.value]
-            operations.append(params)
+                    setattr(config, param.value, entry.meta[param.value])
+
+            operations.append(config)
 
     # pre-calculate operation parameters defined by configuration
     for op in operations:
         filters = []
 
-        if OperationParams.TIME.value in op:
+        if op.time:
             filters.append(
-                TimeFilter(options_map, FavaOptions(), op[OperationParams.TIME.value])
+                TimeFilter(options_map, FavaOptions(), op.time)
             )
-        if OperationParams.ACCOUNT.value in op:
-            filters.append(AccountFilter(op[OperationParams.ACCOUNT.value]))
-        if OperationParams.ADVANCED.value in op:
-            filters.append(AdvancedFilter(op[OperationParams.ADVANCED.value]))
+        if op.account:
+            filters.append(AccountFilter(op.account))
+        if op.filter:
+            filters.append(AdvancedFilter(op.filter))
 
-        # a bit hacky but just store pre-calculated values in the same dictionary
-        op["filters"] = filters
+        # Store pre-calculated values
+        op.filters = filters
 
-        if OperationParams.ADD_TAGS.value in op:
-            op["tagValues"] = (
-                op[OperationParams.ADD_TAGS.value].replace("#", "").split(" ")
-            )
+        if op.addTags:
+            op.tagValues = op.addTags.replace("#", "").split(" ")
 
     # now apply all operations to all entries (if necessary)
     new_entries = []
     for entry in entries:
+        if (
+            isinstance(entry, Custom)
+            and entry.type == "filter-map"
+            and entry.values[0].value.strip() == "apply"
+        ):
+            # ignore filter-map apply entries
+            continue
         if not isinstance(entry, Transaction):
             # ignore non-Transactions
             new_entries.append(entry)
@@ -102,18 +136,19 @@ def filter_map(entries, options_map, config_str=None):
         new_entry = entry
         for op in operations:
             matched = True
-            for f in op["filters"]:
+            for f in op.filters:
                 if not matches_filter(new_entry, f):
                     matched = False
 
             if matched:
+                op.times_applied += 1  # Increment the apply count
                 new_tags = new_entry.tags
-                if OperationParams.ADD_TAGS.value in op:
+                if op.addTags:
                     new_tags = set(new_entry.tags)
-                    new_tags.update(op["tagValues"])
+                    new_tags.update(op.tagValues)
                 new_meta = new_entry.meta
-                if OperationParams.ADD_META.value in op:
-                    new_meta_dict = ast.literal_eval(op[OperationParams.ADD_META.value])
+                if op.addMeta:
+                    new_meta_dict = ast.literal_eval(op.addMeta)
                     new_meta.update(new_meta_dict)
 
                 transaction = Transaction(
@@ -130,4 +165,17 @@ def filter_map(entries, options_map, config_str=None):
 
         new_entries.append(new_entry)
 
-    return new_entries, []
+    filter_map_entries = []
+    # Add apply counts as metadata to the filter-map apply entries
+    for i, op in enumerate(operations):
+        entry = op.entry
+        entry.meta["_timesApplied"] = op.times_applied
+        # for better visibility in Fava
+        if op.addTags:
+            entry.values.append(ValueType(op.addTags, str))
+        if op.filter:
+            entry.values.append(ValueType(op.filter, str))
+
+        filter_map_entries.append(entry)
+
+    return filter_map_entries + new_entries, []
