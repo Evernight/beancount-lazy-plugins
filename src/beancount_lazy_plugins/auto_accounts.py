@@ -36,7 +36,7 @@ def auto_insert_open(entries, options_map, config_str=None):
     """
     opened_accounts = {entry.account for entry in entries if isinstance(entry, data.Open)}
 
-    config = ast.literal_eval(config_str)
+    config = ast.literal_eval(config_str or "{}")
     ignored_regex = config.get("ignore_regex", None)
 
     errors = []

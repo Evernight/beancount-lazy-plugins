@@ -8,6 +8,7 @@ Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beanco
 * [valuation](#valuation): track total value of the opaque fund over time
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
+* [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
@@ -162,6 +163,26 @@ Can be used in combination with the [beancount_interpolate](https://github.com/A
 ```
 
 Let's consider example 3 again. For each trip you want to describe it's likely that the filter field is going to be the same. To avoid repeating it for all trips you can save it (or any combination of fields, really) to reuse as a preset in other filters. 
+
+## auto_accounts
+A Beancount plugin that automatically inserts Open directives for accounts not opened (at the date of the first entry). Slightly improved version of the plugin supplied with Beancount by default. Reports all auto-opened accounts and adds metadata to Open directives. This allows to have the convenience of auto-opening accounts but avoiding accidental mistakes in the ledger.
+
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.auto_accounts"
+```
+
+You can optionally configure the plugin to avoid reporting certain accounts in a warning using a regex pattern:
+
+```
+plugin "beancount_lazy_plugins.auto_accounts" "{'ignore_regex': 'Assets:.*:Pending'}"
+```
+
+- **Auto-insertion**: When an account is used in a transaction but doesn't have an Open directive, the plugin automatically creates one at the date of the first entry for that account.
+- **Warning generation**: The plugin generates warnings listing all auto-inserted accounts, which helps you review what was automatically added.
+- **Account filtering**: You can use the `ignore_regex` configuration to exclude certain accounts from reporting
+- **Metadata marking**: Auto-inserted Open directives are marked with `auto_accounts: True` metadata for easy identification.
 
 ## group_pad_transactions
 This plugin improves treatment of pad/balance operations, in partucular if you use them following
