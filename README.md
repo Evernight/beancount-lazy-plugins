@@ -10,6 +10,7 @@ Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beanco
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 * [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
 * [currency_convert](#currency_convert): convert posting amounts to different currencies using price data
+* [expense_merchant_map](#expense_merchant_map): automatically extend expense account names to include merchant names
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
@@ -213,6 +214,18 @@ After processing, the expense posting becomes:
 Expenses:Food            120.00 USD
     converted_from: "100.00 EUR"
 ```
+
+## expense_merchant_map
+A Beancount plugin that automatically extends expense account names to include merchant names derived from transaction payees or narrations. This helps create more detailed (but rough) expense categorization by merchant while maintaining your existing high-level expense account structure. May be useful as a quick experiment.
+
+### Usage
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.expense_merchant_map"
+```
+
+It probably doesn't make sense to keep it on all the time, but could be fun as a quick experiment
 
 ## group_pad_transactions
 This plugin improves treatment of pad/balance operations, in partucular if you use them following
