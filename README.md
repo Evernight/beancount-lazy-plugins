@@ -1,5 +1,5 @@
 # beancount-lazy-plugins
-Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beancount) (but can also be useful on their own).
+Set of plugins for lazy (or not so) people used by [lazy-beancount](https://github.com/Evernight/lazy-beancount) (but can also be useful on their own).
 
 ## Installation
 ```pip3 install git+https://github.com/Evernight/beancount-lazy-plugins```
@@ -9,6 +9,8 @@ Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beanco
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 * [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
+* [generate_base_ccy_prices](#generate_base_ccy_prices): generate base currency prices for all currencies in the ledger (based on the original from [tariochbctools](https://github.com/tarioch/beancounttools/blob/master/src/tariochbctools/plugins/generate_base_ccy_prices.py
+))
 * [currency_convert](#currency_convert): convert posting amounts to different currencies using price data
 * [expense_merchant_map](#expense_merchant_map): automatically extend expense account names to include merchant names
 
