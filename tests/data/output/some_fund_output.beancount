@@ -14,16 +14,24 @@
   Assets:SomeFund:Total  500.0000000 SOME_FUND_USD {1 USD, 2024-01-10}
 
 2024-01-11 custom "valuation" Assets:SomeFund:Total 400 USD
+  lastBalance: 500
+  calculatedPrice: 0.8
 
 2024-01-11 price SOME_FUND_USD                         0.8 USD
+  lastBalance: 500
+  calculatedPrice: 0.8
 
 2024-01-13 * "Investing $500 more in SomeFund" #valuation-applied
   Assets:Physical:Cash          -500 USD
   Assets:SomeFund:Total  625.0000000 SOME_FUND_USD {0.8 USD, 2024-01-13}
 
 2024-02-11 custom "valuation" Assets:SomeFund:Total 1200 USD
+  lastBalance: 1125
+  calculatedPrice: 1.066666666666666666666666667
 
 2024-02-11 price SOME_FUND_USD          1.066666666666666666666666667 USD
+  lastBalance: 1125
+  calculatedPrice: 1.066666666666666666666666667
 
 2024-02-12 * "Withdraw $300 from SomeFund" #valuation-applied
   Assets:Physical:Cash         400.00 USD
@@ -37,8 +45,12 @@
   Assets:SomeFund:Total  656.2500000 SOME_FUND_USD {1.066666666666666666666666667 USD, 2024-02-14}
 
 2024-03-05 custom "valuation" Assets:SomeFund:Total 1600 USD
+  lastBalance: 1406.250000000000000000000000
+  calculatedPrice: 1.137777777777777777777777778
 
 2024-03-05 price SOME_FUND_USD          1.137777777777777777777777778 USD
+  lastBalance: 1406.250000000000000000000000
+  calculatedPrice: 1.137777777777777777777777778
 
 2024-03-07 commodity SOME_FUND_USD
 
