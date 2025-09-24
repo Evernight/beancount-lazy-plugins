@@ -9,6 +9,7 @@ Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beanco
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 * [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
+* [currency_convert](#currency_convert): convert posting amounts to different currencies using price data
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
@@ -183,6 +184,35 @@ plugin "beancount_lazy_plugins.auto_accounts" "{'ignore_regex': 'Assets:.*:Pendi
 - **Warning generation**: The plugin generates warnings listing all auto-inserted accounts, which helps you review what was automatically added.
 - **Account filtering**: You can use the `ignore_regex` configuration to exclude certain accounts from reporting
 - **Metadata marking**: Auto-inserted Open directives are marked with `auto_accounts: True` metadata for easy identification.
+
+## currency_convert
+A Beancount plugin that automatically converts posting amounts to different currencies based on `convert_to` metadata. This plugin processes all transactions and converts postings that have a `convert_to: "<target_currency>"` metadata field using the price data available in your ledger.
+
+### Usage
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.currency_convert"
+```
+
+Then add `convert_to` metadata to any posting you want to convert:
+
+### Example
+```
+; Price data
+2024-01-15 price EUR 1.20 USD
+
+2024-01-15 * "Convert EUR expense to USD"
+    Assets:Cash:USD         -120.00 USD
+    Expenses:Food            100.00 EUR
+        convert_to: "USD"
+```
+
+After processing, the expense posting becomes:
+```
+Expenses:Food            120.00 USD
+    converted_from: "100.00 EUR"
+```
 
 ## group_pad_transactions
 This plugin improves treatment of pad/balance operations, in partucular if you use them following
