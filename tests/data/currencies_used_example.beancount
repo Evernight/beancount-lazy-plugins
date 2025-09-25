@@ -1,0 +1,29 @@
+plugin "beancount_lazy_plugins.currencies_used"
+
+1970-01-01 open Assets:Cash
+1970-01-01 open Assets:Investment
+1970-01-01 open Assets:Stocks
+1970-01-01 open Income:Salary
+1970-01-01 open Expenses:Food
+
+option "operating_currency" "USD"
+
+2024-01-10 * "Salary in USD"
+    Assets:Cash         1000 USD
+    Income:Salary      -1000 USD
+
+2024-01-11 * "Investment in EUR"
+    Assets:Investment    500 EUR
+    Assets:Cash         -500 EUR
+
+2024-01-12 * "Food expense in GBP"
+    Expenses:Food        50 GBP
+    Assets:Cash         -50 GBP
+
+2024-01-13 * "Stock purchase with multiple currencies"
+    Assets:Stocks        10 AAPL {150 USD} @ 155 EUR
+    Assets:Cash       -1500 USD
+
+2024-01-14 * "Another EUR transaction"
+    Assets:Investment    300 EUR
+    Assets:Cash         -300 EUR
