@@ -1,0 +1,27 @@
+; Example file demonstrating balance_extended plugin functionality
+
+plugin "beancount_lazy_plugins.balance_extended"
+
+; Open accounts with multiple currencies
+2014-12-31 open Assets:Checking USD,EUR
+2014-12-31 open Equity:Opening-Balances
+
+; Example 1: balance full operation
+; This will expand into separate balance assertions for EUR and USD
+2015-01-01 custom "balance" "full" Assets:Checking 100 EUR 230 USD
+
+; Example 2: balance soft operation  
+; This will create a pad directive on 2015-01-31 and balance assertions on 2015-02-01
+2015-02-01 custom "balance" "soft" Assets:Checking Equity:Opening-Balances 150 EUR 300 USD
+
+; Some transactions to make the example more realistic
+2015-01-05 * "Deposit"
+  Assets:Checking   50.00 USD
+  Equity:Opening-Balances
+
+2015-01-10 * "Currency exchange"
+  Assets:Checking   25.00 EUR
+  Assets:Checking  -30.00 USD
+
+; Another balance full example with single currency
+2015-03-01 custom "balance" "full" Assets:Checking 200 USD
