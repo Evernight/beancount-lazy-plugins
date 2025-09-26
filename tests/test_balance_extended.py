@@ -26,7 +26,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
         )
         
         entries = [custom_entry]
@@ -48,7 +48,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "EUR", D("230"), "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
         )
         
         entries = [custom_entry]
@@ -78,7 +78,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", D("100"), "USD"]
+            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD")]
         )
         
         entries = [custom_entry]
@@ -108,7 +108,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", D("100"), "EUR", D("230"), "USD"]
+            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
         )
         
         entries = [custom_entry]
@@ -145,7 +145,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", "100.50", "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100.50"), "USD")]
         )
         
         entries = [custom_entry]
@@ -174,25 +174,25 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("balance_type account amount1 currency1", errors[0].message)
+        self.assertIn("balance_type account amount1", errors[0].message)
 
-    def test_balance_full_odd_number_of_values(self):
-        """Test balance full with odd number of amount/currency values."""
+    def test_balance_full_invalid_amount_object(self):
+        """Test balance full with invalid amount object."""
         meta = data.new_metadata("test.beancount", 1)
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "USD", D("200")]  # Missing currency for 200
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD"), D("200")]  # Invalid: raw Decimal instead of Amount
         )
         
         entries = [custom_entry]
         new_entries, errors = balance_extended(entries, self.options_map)
         
-        self.assertEqual(len(new_entries), 0)
+        self.assertEqual(len(new_entries), 1)  # First amount should work
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("pairs of amount and currency", errors[0].message)
+        self.assertIn("Expected Amount object", errors[0].message)
 
     def test_balance_padded_insufficient_arguments(self):
         """Test balance padded with insufficient arguments."""
@@ -210,7 +210,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("balance_type account pad_account amount1 currency1", errors[0].message)
+        self.assertIn("balance_type account pad_account amount1", errors[0].message)
 
     def test_invalid_account_type(self):
         """Test with non-string account."""
@@ -231,13 +231,13 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertIn("must be an account name (string)", errors[0].message)
 
     def test_invalid_amount_value(self):
-        """Test with invalid amount value."""
+        """Test with invalid amount value (not an Amount object)."""
         meta = data.new_metadata("test.beancount", 1)
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", "invalid", "USD"]
+            values=["full", "Assets:Checking", "invalid"]  # String instead of Amount object
         )
         
         entries = [custom_entry]
@@ -246,16 +246,16 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("Invalid amount value", errors[0].message)
+        self.assertIn("Expected Amount object", errors[0].message)
 
-    def test_non_string_currency(self):
-        """Test with non-string currency."""
+    def test_non_amount_object(self):
+        """Test with non-Amount object where Amount is expected."""
         meta = data.new_metadata("test.beancount", 1)
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), 123]  # Currency should be string
+            values=["full", "Assets:Checking", 123]  # Integer instead of Amount object
         )
         
         entries = [custom_entry]
@@ -264,7 +264,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("Currency must be a string", errors[0].message)
+        self.assertIn("Expected Amount object", errors[0].message)
 
     def test_invalid_balance_type(self):
         """Test with invalid balance type."""
@@ -354,14 +354,14 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "EUR", D("230"), "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
         )
         
         balance_padded_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 2, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", D("150"), "EUR"]
+            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("150"), "EUR")]
         )
         
         entries = [open_entry, balance_full_entry, balance_padded_entry]
@@ -399,7 +399,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
         )
         
         entries = [open_entry, balance_entry]
@@ -438,7 +438,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", D("50"), "EUR"]
+            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("50"), "EUR")]
         )
         
         entries = [open_entry, balance_entry]
@@ -473,7 +473,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Unknown", D("100"), "USD", D("50"), "EUR"]
+            values=["full", "Assets:Unknown", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
         )
         
         entries = [balance_entry]
@@ -507,7 +507,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", D("100"), "USD"]
+            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
         )
         
         entries = [open_entry, balance_entry]
@@ -592,7 +592,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", D("100"), "USD"]
+            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD")]
         )
         
         entries = [open_entry, balance_entry]
@@ -637,7 +637,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", D("100"), "USD", D("50"), "EUR"]
+            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
         )
         
         entries = [open_entry, balance_entry]
@@ -674,7 +674,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Unknown", "Equity:Opening-Balances", D("100"), "USD", D("50"), "EUR"]
+            values=["full-padded", "Assets:Unknown", "Equity:Opening-Balances", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
         )
         
         entries = [balance_entry]
