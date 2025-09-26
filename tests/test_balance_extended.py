@@ -25,7 +25,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "USD"]
         )
         
@@ -47,7 +47,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "EUR", D("230"), "USD"]
         )
         
@@ -77,7 +77,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["soft", "Assets:Checking", "Equity:Opening-Balances", D("100"), "USD"]
         )
         
@@ -107,7 +107,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["soft", "Assets:Checking", "Equity:Opening-Balances", D("100"), "EUR", D("230"), "USD"]
         )
         
@@ -144,7 +144,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", "100.50", "USD"]
         )
         
@@ -164,7 +164,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking"]  # Missing amount and currency
         )
         
@@ -182,7 +182,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "USD", D("200")]  # Missing currency for 200
         )
         
@@ -200,7 +200,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["soft", "Assets:Checking", "Equity:Opening-Balances"]  # Missing amount and currency
         )
         
@@ -218,7 +218,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", 123, D("100"), "USD"]  # Account should be string
         )
         
@@ -236,7 +236,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", "invalid", "USD"]
         )
         
@@ -254,7 +254,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), 123]  # Currency should be string
         )
         
@@ -272,7 +272,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["invalid", "Assets:Checking", D("100"), "USD"]  # Invalid balance type
         )
         
@@ -291,7 +291,7 @@ class TestBalanceExtended(unittest.TestCase):
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=[123, "Assets:Checking", D("100"), "USD"]  # Balance type should be string
         )
         
@@ -301,7 +301,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("First argument to balance must be balance type (string)", errors[0].message)
+        self.assertIn("First argument to balance-ext must be balance type (string)", errors[0].message)
 
     def test_other_custom_directives_preserved(self):
         """Test that other custom directives are preserved."""
@@ -353,14 +353,14 @@ class TestBalanceExtended(unittest.TestCase):
         balance_full_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "EUR", D("230"), "USD"]
         )
         
         balance_soft_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 2, 1),
-            type="balance",
+            type="balance-ext",
             values=["soft", "Assets:Checking", "Equity:Opening-Balances", D("150"), "EUR"]
         )
         
@@ -398,7 +398,7 @@ class TestBalanceExtended(unittest.TestCase):
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "USD"]
         )
         
@@ -437,7 +437,7 @@ class TestBalanceExtended(unittest.TestCase):
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["soft", "Assets:Checking", "Equity:Opening-Balances", D("50"), "EUR"]
         )
         
@@ -472,7 +472,7 @@ class TestBalanceExtended(unittest.TestCase):
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Unknown", D("100"), "USD", D("50"), "EUR"]
         )
         
@@ -506,7 +506,7 @@ class TestBalanceExtended(unittest.TestCase):
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
-            type="balance",
+            type="balance-ext",
             values=["full", "Assets:Checking", D("100"), "USD"]
         )
         

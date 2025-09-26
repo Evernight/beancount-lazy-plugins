@@ -10,11 +10,11 @@ plugin "beancount_lazy_plugins.balance_extended"
 ; Example 1: balance full operation
 ; This will expand into separate balance assertions for EUR and USD
 ; Since the account is opened with USD,EUR,GBP, this will also create GBP 0 balance
-2015-01-01 custom "balance" "full" Assets:Checking 100 EUR 230 USD
+2015-01-01 custom "balance-ext" "full" Assets:Checking 100 EUR 230 USD
 
 ; Example 2: balance soft operation  
 ; This will create a pad directive on 2015-01-31 and balance assertions on 2015-02-01
-2015-02-01 custom "balance" "soft" Assets:Checking Equity:Opening-Balances 150 EUR 300 USD
+2015-02-01 custom "balance-ext" "soft" Assets:Checking Equity:Opening-Balances 150 EUR 300 USD
 
 ; Some transactions to make the example more realistic
 2015-01-05 * "Deposit"
@@ -28,8 +28,8 @@ plugin "beancount_lazy_plugins.balance_extended"
 ; Example 3: balance full with zero currencies demonstration
 ; The account Assets:Savings is opened with USD,CAD
 ; This balance directive only specifies USD, so CAD will be asserted as 0
-2015-03-01 custom "balance" "full" Assets:Savings 500 USD
+2015-03-01 custom "balance-ext" "full" Assets:Savings 500 USD
 
 ; Example 4: balance full with partial currencies
 ; This will create balance assertions for all currencies: CAD (25), USD (0)
-2015-04-01 custom "balance" "full" Assets:Savings 25 CAD
+2015-04-01 custom "balance-ext" "full" Assets:Savings 25 CAD

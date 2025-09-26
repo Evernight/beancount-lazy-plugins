@@ -6,10 +6,10 @@ This plugin implements balance operations with a type parameter:
 1. balance full: Expands into separate balance assertions for each currency.
    For currencies declared in the account's Open directive but not specified
    in the balance directive, creates balance assertions with amount 0.
-   Example: 2015-01-01 custom "balance" "full" Account 100 EUR 230 USD
+   Example: 2015-01-01 custom "balance-ext" "full" Account 100 EUR 230 USD
    
 2. balance soft: Same as balance full but also generates pad directives on day-1
-   Example: 2015-01-01 custom "balance" "soft" Account PadAccount 100 EUR 230 USD
+   Example: 2015-01-01 custom "balance-ext" "soft" Account PadAccount 100 EUR 230 USD
 
 The Account "Open" instruction should specify all of the currencies used.
 """
@@ -54,7 +54,7 @@ def balance_extended(entries, options_map, config_str=None):
     
     for entry in entries:
         if isinstance(entry, data.Custom):
-            if entry.type == "balance":
+            if entry.type == "balance-ext":
                 # Process balance custom operation
                 balance_entries, entry_errors = process_balance(entry, account_currencies)
                 new_entries.extend(balance_entries)
@@ -94,7 +94,7 @@ def process_balance(custom_entry, account_currencies):
     """Common logic for processing balance custom operations.
     
     Args:
-      custom_entry: A Custom directive with type "balance"
+      custom_entry: A Custom directive with type "balance-ext"
       account_currencies: Dictionary mapping account names to sets of currencies
     Returns:
       A tuple of (list of new entries, list of errors)
@@ -106,7 +106,7 @@ def process_balance(custom_entry, account_currencies):
     if len(custom_entry.values) < 1:
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            "balance directive requires at least balance_type parameter",
+            "balance-ext directive requires at least balance_type parameter",
             custom_entry
         ))
         return new_entries, errors
@@ -115,7 +115,7 @@ def process_balance(custom_entry, account_currencies):
     if not isinstance(balance_type_str, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            "First argument to balance must be balance type (string)",
+            "First argument to balance-ext must be balance type (string)",
             custom_entry
         ))
         return new_entries, errors
@@ -146,7 +146,7 @@ def process_balance(custom_entry, account_currencies):
     if len(custom_entry.values) < min_args:
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            f"balance {balance_type.value} requires at least {expected_format}",
+            f"balance-ext {balance_type.value} requires at least {expected_format}",
             custom_entry
         ))
         return new_entries, errors
@@ -155,7 +155,7 @@ def process_balance(custom_entry, account_currencies):
     if not isinstance(account, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            f"Second argument to balance {balance_type.value} must be an account name (string)",
+            f"Second argument to balance-ext {balance_type.value} must be an account name (string)",
             custom_entry
         ))
         return new_entries, errors
@@ -166,7 +166,7 @@ def process_balance(custom_entry, account_currencies):
         if not isinstance(pad_account, str):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
-                f"Third argument to balance {balance_type.value} must be a pad account name (string)",
+                f"Third argument to balance-ext {balance_type.value} must be a pad account name (string)",
                 custom_entry
             ))
             return new_entries, errors
@@ -186,7 +186,7 @@ def process_balance(custom_entry, account_currencies):
     if len(values) % 2 != 0:
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            f"balance {balance_type.value} requires pairs of amount and currency",
+            f"balance-ext {balance_type.value} requires pairs of amount and currency",
             custom_entry
         ))
         return new_entries, errors
