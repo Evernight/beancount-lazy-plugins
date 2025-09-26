@@ -3,7 +3,9 @@ A Beancount plugin that adds custom balance operations.
 
 This plugin implements balance operations with a type parameter:
 
-1. balance full: Expands into separate balance assertions for each currency
+1. balance full: Expands into separate balance assertions for each currency.
+   For currencies declared in the account's Open directive but not specified
+   in the balance directive, creates balance assertions with amount 0.
    Example: 2015-01-01 custom "balance" "full" Account 100 EUR 230 USD
    
 2. balance soft: Same as balance full but also generates pad directives on day-1
@@ -47,11 +49,14 @@ def balance_extended(entries, options_map, config_str=None):
     errors = []
     new_entries = []
     
+    # Build mapping of account currencies from Open directives
+    account_currencies = build_account_currencies_mapping(entries)
+    
     for entry in entries:
         if isinstance(entry, data.Custom):
             if entry.type == "balance":
                 # Process balance custom operation
-                balance_entries, entry_errors = process_balance(entry)
+                balance_entries, entry_errors = process_balance(entry, account_currencies)
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
             else:
@@ -64,11 +69,33 @@ def balance_extended(entries, options_map, config_str=None):
     return new_entries, errors
 
 
-def process_balance(custom_entry):
+def build_account_currencies_mapping(entries):
+    """Build a mapping of account names to their declared currencies.
+    
+    Args:
+      entries: A list of directives.
+    Returns:
+      A dictionary mapping account names to sets of currency strings.
+    """
+    account_currencies = {}
+    
+    for entry in entries:
+        if isinstance(entry, data.Open):
+            if entry.currencies:
+                account_currencies[entry.account] = set(entry.currencies)
+            else:
+                # If no currencies specified, use empty set
+                account_currencies[entry.account] = set()
+    
+    return account_currencies
+
+
+def process_balance(custom_entry, account_currencies):
     """Common logic for processing balance custom operations.
     
     Args:
       custom_entry: A Custom directive with type "balance"
+      account_currencies: Dictionary mapping account names to sets of currencies
     Returns:
       A tuple of (list of new entries, list of errors)
     """
@@ -164,7 +191,8 @@ def process_balance(custom_entry):
         ))
         return new_entries, errors
     
-    # Create balance assertions for each currency
+    # Parse explicit currency amounts from the directive
+    explicit_currencies = {}
     for i in range(0, len(values), 2):
         amount_value = values[i]
         currency = values[i + 1]
@@ -198,6 +226,20 @@ def process_balance(custom_entry):
                 custom_entry
             ))
             continue
+        
+        explicit_currencies[currency] = amount_value
+    
+    # Determine which currencies to create balance assertions for
+    currencies_to_assert = set(explicit_currencies.keys())
+    
+    # For "full" balance type, add all currencies from the account's Open directive
+    if balance_type == BalanceType.FULL:
+        account_declared_currencies = account_currencies.get(account, set())
+        currencies_to_assert.update(account_declared_currencies)
+    
+    # Create balance assertions for all required currencies
+    for currency in sorted(currencies_to_assert):  # Sort for consistent ordering
+        amount_value = explicit_currencies.get(currency, D('0'))  # Default to 0 if not specified
         
         # Create a Balance directive
         balance_amount = amount.Amount(amount_value, currency)

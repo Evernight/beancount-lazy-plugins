@@ -381,6 +381,199 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertIsInstance(new_entries[3], data.Pad)
         self.assertIsInstance(new_entries[4], data.Balance)
 
+    def test_balance_full_with_zero_currencies(self):
+        """Test balance full creates zero balance assertions for missing currencies."""
+        meta = data.new_metadata("test.beancount", 1)
+        
+        # Open account with multiple currencies
+        open_entry = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Checking",
+            currencies=["USD", "EUR", "GBP"],
+            booking=None
+        )
+        
+        # Balance directive only specifies USD, should create EUR and GBP as 0
+        balance_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance",
+            values=["full", "Assets:Checking", D("100"), "USD"]
+        )
+        
+        entries = [open_entry, balance_entry]
+        new_entries, errors = balance_extended(entries, self.options_map)
+        
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(new_entries), 4)  # 1 open + 3 balance assertions
+        
+        # Check that open entry is preserved
+        self.assertEqual(new_entries[0], open_entry)
+        
+        # Check balance assertions - should be sorted by currency
+        balance_assertions = [e for e in new_entries[1:] if isinstance(e, data.Balance)]
+        self.assertEqual(len(balance_assertions), 3)
+        
+        # Should be sorted: EUR (0), GBP (0), USD (100)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("0"), "EUR"))
+        self.assertEqual(balance_assertions[1].amount, amount.Amount(D("0"), "GBP"))
+        self.assertEqual(balance_assertions[2].amount, amount.Amount(D("100"), "USD"))
+
+    def test_balance_soft_with_zero_currencies(self):
+        """Test balance soft creates zero balance assertions for missing currencies."""
+        meta = data.new_metadata("test.beancount", 1)
+        
+        # Open account with multiple currencies
+        open_entry = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Checking",
+            currencies=["USD", "EUR", "CAD"],
+            booking=None
+        )
+        
+        # Balance directive only specifies EUR, should create USD and CAD as 0
+        balance_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance",
+            values=["soft", "Assets:Checking", "Equity:Opening-Balances", D("50"), "EUR"]
+        )
+        
+        entries = [open_entry, balance_entry]
+        new_entries, errors = balance_extended(entries, self.options_map)
+        
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(new_entries), 5)  # 1 open + 1 pad + 3 balance assertions
+        
+        # Check that open entry is preserved
+        self.assertEqual(new_entries[0], open_entry)
+        
+        # Check pad entry
+        self.assertIsInstance(new_entries[1], data.Pad)
+        self.assertEqual(new_entries[1].account, "Assets:Checking")
+        self.assertEqual(new_entries[1].source_account, "Equity:Opening-Balances")
+        
+        # Check balance assertions - should be sorted by currency
+        balance_assertions = [e for e in new_entries[2:] if isinstance(e, data.Balance)]
+        self.assertEqual(len(balance_assertions), 3)
+        
+        # Should be sorted: CAD (0), EUR (50), USD (0)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("0"), "CAD"))
+        self.assertEqual(balance_assertions[1].amount, amount.Amount(D("50"), "EUR"))
+        self.assertEqual(balance_assertions[2].amount, amount.Amount(D("0"), "USD"))
+
+    def test_balance_full_no_open_directive(self):
+        """Test balance full when account has no Open directive."""
+        meta = data.new_metadata("test.beancount", 1)
+        
+        # No open directive for the account
+        balance_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance",
+            values=["full", "Assets:Unknown", D("100"), "USD", D("50"), "EUR"]
+        )
+        
+        entries = [balance_entry]
+        new_entries, errors = balance_extended(entries, self.options_map)
+        
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(new_entries), 2)  # 2 balance assertions only
+        
+        # Check balance assertions - should only create what's specified
+        balance_assertions = [e for e in new_entries if isinstance(e, data.Balance)]
+        self.assertEqual(len(balance_assertions), 2)
+        
+        # Should be sorted: EUR (50), USD (100)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("50"), "EUR"))
+        self.assertEqual(balance_assertions[1].amount, amount.Amount(D("100"), "USD"))
+
+    def test_balance_full_empty_currencies_in_open(self):
+        """Test balance full when Open directive has no currencies specified."""
+        meta = data.new_metadata("test.beancount", 1)
+        
+        # Open account with no currencies specified
+        open_entry = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Checking",
+            currencies=None,  # No currencies specified
+            booking=None
+        )
+        
+        balance_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance",
+            values=["full", "Assets:Checking", D("100"), "USD"]
+        )
+        
+        entries = [open_entry, balance_entry]
+        new_entries, errors = balance_extended(entries, self.options_map)
+        
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(new_entries), 2)  # 1 open + 1 balance assertion
+        
+        # Check that open entry is preserved
+        self.assertEqual(new_entries[0], open_entry)
+        
+        # Check balance assertion - should only create what's specified
+        balance_assertions = [e for e in new_entries[1:] if isinstance(e, data.Balance)]
+        self.assertEqual(len(balance_assertions), 1)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("100"), "USD"))
+
+    def test_build_account_currencies_mapping(self):
+        """Test the build_account_currencies_mapping function directly."""
+        from beancount_lazy_plugins.balance_extended import build_account_currencies_mapping
+        
+        meta = data.new_metadata("test.beancount", 1)
+        
+        # Create some Open entries
+        open1 = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Checking",
+            currencies=["USD", "EUR"],
+            booking=None
+        )
+        
+        open2 = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Savings",
+            currencies=["USD", "CAD", "GBP"],
+            booking=None
+        )
+        
+        open3 = data.Open(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Investment",
+            currencies=None,  # No currencies
+            booking=None
+        )
+        
+        # Add some non-Open entries that should be ignored
+        other_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="other",
+            values=["test"]
+        )
+        
+        entries = [open1, open2, open3, other_entry]
+        mapping = build_account_currencies_mapping(entries)
+        
+        expected = {
+            "Assets:Checking": {"USD", "EUR"},
+            "Assets:Savings": {"USD", "CAD", "GBP"},
+            "Assets:Investment": set()  # Empty set for None currencies
+        }
+        
+        self.assertEqual(mapping, expected)
+
 
 if __name__ == '__main__':
     unittest.main()
