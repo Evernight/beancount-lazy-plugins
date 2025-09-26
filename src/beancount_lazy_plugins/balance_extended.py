@@ -8,8 +8,12 @@ This plugin implements balance operations with a type parameter:
    in the balance directive, creates balance assertions with amount 0.
    Example: 2015-01-01 custom "balance-ext" "full" Account 100 EUR 230 USD
    
-2. balance soft: Same as balance full but also generates pad directives on day-1
-   Example: 2015-01-01 custom "balance-ext" "soft" Account PadAccount 100 EUR 230 USD
+2. balance padded: Same as balance full but also generates pad directives on day-1
+   Example: 2015-01-01 custom "balance-ext" "padded" Account PadAccount 100 EUR 230 USD
+
+3. balance full-padded: Combines full and padded behavior - asserts all declared currencies
+   and generates pad directives on day-1
+   Example: 2015-01-01 custom "balance-ext" "full-padded" Account PadAccount 100 EUR 230 USD
 
 The Account "Open" instruction should specify all of the currencies used.
 """
@@ -28,7 +32,8 @@ __plugins__ = ["balance_extended"]
 class BalanceType(Enum):
     """Enum for balance operation types."""
     FULL = "full"
-    SOFT = "soft"
+    PADDED = "padded"
+    FULL_PADDED = "full-padded"
 
 BalanceExtendedError = collections.namedtuple(
     "BalanceExtendedError", "source message entry"
@@ -101,7 +106,7 @@ def process_balance(custom_entry, account_currencies):
     """
     errors = []
     new_entries = []
-    
+
     # Parse balance type from first parameter
     if len(custom_entry.values) < 1:
         errors.append(BalanceExtendedError(
@@ -111,7 +116,7 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    balance_type_str = custom_entry.values[0]
+    balance_type_str = custom_entry.values[0].value
     if not isinstance(balance_type_str, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -125,7 +130,7 @@ def process_balance(custom_entry, account_currencies):
     except ValueError:
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            f"Invalid balance type: {balance_type_str}. Must be 'full' or 'soft'",
+            f"Invalid balance type: {balance_type_str}. Must be 'full', 'padded', or 'full-padded'",
             custom_entry
         ))
         return new_entries, errors
@@ -135,7 +140,11 @@ def process_balance(custom_entry, account_currencies):
         min_args = 4  # balance_type + account + at least one amount/currency pair
         expected_format = "balance_type account amount1 currency1 amount2 currency2 ..."
         values_start_index = 2
-    elif balance_type == BalanceType.SOFT:
+    elif balance_type == BalanceType.PADDED:
+        min_args = 5  # balance_type + account + pad_account + at least one amount/currency pair
+        expected_format = "balance_type account pad_account amount1 currency1 amount2 currency2 ..."
+        values_start_index = 3
+    elif balance_type == BalanceType.FULL_PADDED:
         min_args = 5  # balance_type + account + pad_account + at least one amount/currency pair
         expected_format = "balance_type account pad_account amount1 currency1 amount2 currency2 ..."
         values_start_index = 3
@@ -160,8 +169,8 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    # Handle pad account for soft balances
-    if balance_type == BalanceType.SOFT:
+    # Handle pad account for padded balances
+    if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
         pad_account = custom_entry.values[2]
         if not isinstance(pad_account, str):
             errors.append(BalanceExtendedError(
@@ -232,8 +241,8 @@ def process_balance(custom_entry, account_currencies):
     # Determine which currencies to create balance assertions for
     currencies_to_assert = set(explicit_currencies.keys())
     
-    # For "full" balance type, add all currencies from the account's Open directive
-    if balance_type == BalanceType.FULL:
+    # For "full" and "full-padded" balance types, add all currencies from the account's Open directive
+    if balance_type == BalanceType.FULL or balance_type == BalanceType.FULL_PADDED:
         account_declared_currencies = account_currencies.get(account, set())
         currencies_to_assert.update(account_declared_currencies)
     
