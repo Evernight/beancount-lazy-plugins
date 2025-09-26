@@ -95,6 +95,16 @@ def build_account_currencies_mapping(entries):
     return account_currencies
 
 
+def _extract_value(value_wrapper):
+    """Extract the actual value from a ValueType wrapper or return the value directly.
+    
+    This handles both parsed values (wrapped in ValueType) and direct values (from tests).
+    """
+    if hasattr(value_wrapper, 'value'):
+        return value_wrapper.value
+    return value_wrapper
+
+
 def process_balance(custom_entry, account_currencies):
     """Common logic for processing balance custom operations.
     
@@ -116,7 +126,7 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    balance_type_str = custom_entry.values[0].value
+    balance_type_str = _extract_value(custom_entry.values[0])
     if not isinstance(balance_type_str, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -137,16 +147,16 @@ def process_balance(custom_entry, account_currencies):
     
     # Determine expected format and minimum arguments based on type
     if balance_type == BalanceType.FULL:
-        min_args = 4  # balance_type + account + at least one amount/currency pair
-        expected_format = "balance_type account amount1 currency1 amount2 currency2 ..."
+        min_args = 3  # balance_type + account + at least one amount
+        expected_format = "balance_type account amount1 amount2 ..."
         values_start_index = 2
     elif balance_type == BalanceType.PADDED:
-        min_args = 5  # balance_type + account + pad_account + at least one amount/currency pair
-        expected_format = "balance_type account pad_account amount1 currency1 amount2 currency2 ..."
+        min_args = 4  # balance_type + account + pad_account + at least one amount
+        expected_format = "balance_type account pad_account amount1 amount2 ..."
         values_start_index = 3
     elif balance_type == BalanceType.FULL_PADDED:
-        min_args = 5  # balance_type + account + pad_account + at least one amount/currency pair
-        expected_format = "balance_type account pad_account amount1 currency1 amount2 currency2 ..."
+        min_args = 4  # balance_type + account + pad_account + at least one amount
+        expected_format = "balance_type account pad_account amount1 amount2 ..."
         values_start_index = 3
     else:
         raise ValueError(f"Invalid balance_type: {balance_type}")
@@ -160,7 +170,7 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    account = custom_entry.values[1]
+    account = _extract_value(custom_entry.values[1])
     if not isinstance(account, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -171,7 +181,7 @@ def process_balance(custom_entry, account_currencies):
     
     # Handle pad account for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
-        pad_account = custom_entry.values[2]
+        pad_account = _extract_value(custom_entry.values[2])
         if not isinstance(pad_account, str):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
@@ -190,53 +200,73 @@ def process_balance(custom_entry, account_currencies):
         )
         new_entries.append(pad_entry)
     
-    # Parse amount/currency pairs
+    # Parse amount values (either Amount objects or number/currency pairs)
     values = custom_entry.values[values_start_index:]
-    if len(values) % 2 != 0:
-        errors.append(BalanceExtendedError(
-            custom_entry.meta,
-            f"balance-ext {balance_type.value} requires pairs of amount and currency",
-            custom_entry
-        ))
-        return new_entries, errors
     
     # Parse explicit currency amounts from the directive
     explicit_currencies = {}
-    for i in range(0, len(values), 2):
-        amount_value = values[i]
-        currency = values[i + 1]
-        
-        # Convert amount to Decimal if it's not already
-        if isinstance(amount_value, str):
-            try:
-                amount_value = D(amount_value)
-            except:
+    
+    # Check if we have Amount objects (from file parsing) or separate values (from tests)
+    if values and isinstance(_extract_value(values[0]), amount.Amount):
+        # Handle Amount objects
+        for value_wrapper in values:
+            amount_obj = _extract_value(value_wrapper)
+            
+            # Verify it's an Amount object
+            if not isinstance(amount_obj, amount.Amount):
                 errors.append(BalanceExtendedError(
                     custom_entry.meta,
-                    f"Invalid amount value: {amount_value}",
+                    f"Expected Amount object, got {type(amount_obj)}: {amount_obj}",
                     custom_entry
                 ))
                 continue
-        elif not isinstance(amount_value, Decimal):
-            try:
-                amount_value = D(str(amount_value))
-            except:
-                errors.append(BalanceExtendedError(
-                    custom_entry.meta,
-                    f"Invalid amount value: {amount_value}",
-                    custom_entry
-                ))
-                continue
-        
-        if not isinstance(currency, str):
+            
+            explicit_currencies[amount_obj.currency] = amount_obj.number
+    else:
+        # Handle separate number/currency pairs (legacy test format)
+        if len(values) % 2 != 0:
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
-                f"Currency must be a string: {currency}",
+                f"balance-ext {balance_type.value} requires pairs of amount and currency",
                 custom_entry
             ))
-            continue
+            return new_entries, errors
         
-        explicit_currencies[currency] = amount_value
+        for i in range(0, len(values), 2):
+            amount_value = _extract_value(values[i])
+            currency = _extract_value(values[i + 1])
+            
+            # Convert amount to Decimal if it's not already
+            if isinstance(amount_value, str):
+                try:
+                    amount_value = D(amount_value)
+                except:
+                    errors.append(BalanceExtendedError(
+                        custom_entry.meta,
+                        f"Invalid amount value: {amount_value}",
+                        custom_entry
+                    ))
+                    continue
+            elif not isinstance(amount_value, Decimal):
+                try:
+                    amount_value = D(str(amount_value))
+                except:
+                    errors.append(BalanceExtendedError(
+                        custom_entry.meta,
+                        f"Invalid amount value: {amount_value}",
+                        custom_entry
+                    ))
+                    continue
+            
+            if not isinstance(currency, str):
+                errors.append(BalanceExtendedError(
+                    custom_entry.meta,
+                    f"Currency must be a string: {currency}",
+                    custom_entry
+                ))
+                continue
+            
+            explicit_currencies[currency] = amount_value
     
     # Determine which currencies to create balance assertions for
     currencies_to_assert = set(explicit_currencies.keys())
