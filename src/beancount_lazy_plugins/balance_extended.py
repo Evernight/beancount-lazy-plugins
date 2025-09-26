@@ -147,16 +147,16 @@ def process_balance(custom_entry, account_currencies):
     
     # Determine expected format and minimum arguments based on type
     if balance_type == BalanceType.FULL:
-        min_args = 4  # balance_type + account + amount + currency (minimum)
-        expected_format = "balance_type account amount1 currency1"
+        min_args = 3  # balance_type + account + amount (minimum)
+        expected_format = "balance_type account amount1 [amount2 ...]"
         values_start_index = 2
     elif balance_type == BalanceType.PADDED:
-        min_args = 5  # balance_type + account + pad_account + amount + currency (minimum)
-        expected_format = "balance_type account pad_account amount1 currency1"
+        min_args = 4  # balance_type + account + pad_account + amount (minimum)
+        expected_format = "balance_type account pad_account amount1 [amount2 ...]"
         values_start_index = 3
     elif balance_type == BalanceType.FULL_PADDED:
-        min_args = 5  # balance_type + account + pad_account + amount + currency (minimum)
-        expected_format = "balance_type account pad_account amount1 currency1"
+        min_args = 4  # balance_type + account + pad_account + amount (minimum)
+        expected_format = "balance_type account pad_account amount1 [amount2 ...]"
         values_start_index = 3
     else:
         raise ValueError(f"Invalid balance_type: {balance_type}")
@@ -200,73 +200,26 @@ def process_balance(custom_entry, account_currencies):
         )
         new_entries.append(pad_entry)
     
-    # Parse amount values (either Amount objects or number/currency pairs)
+    # Parse amount values (Beancount parses amounts as Amount objects)
     values = custom_entry.values[values_start_index:]
     
     # Parse explicit currency amounts from the directive
     explicit_currencies = {}
     
-    # Check if we have Amount objects (from file parsing) or separate values (from tests)
-    if values and isinstance(_extract_value(values[0]), amount.Amount):
-        # Handle Amount objects
-        for value_wrapper in values:
-            amount_obj = _extract_value(value_wrapper)
-            
-            # Verify it's an Amount object
-            if not isinstance(amount_obj, amount.Amount):
-                errors.append(BalanceExtendedError(
-                    custom_entry.meta,
-                    f"Expected Amount object, got {type(amount_obj)}: {amount_obj}",
-                    custom_entry
-                ))
-                continue
-            
-            explicit_currencies[amount_obj.currency] = amount_obj.number
-    else:
-        # Handle separate number/currency pairs (legacy test format)
-        if len(values) % 2 != 0:
+    # Handle Amount objects (Beancount parses amounts as Amount objects)
+    for value_wrapper in values:
+        amount_obj = _extract_value(value_wrapper)
+        
+        # Verify it's an Amount object
+        if not isinstance(amount_obj, amount.Amount):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
-                f"balance-ext {balance_type.value} requires pairs of amount and currency",
+                f"Expected Amount object, got {type(amount_obj)}: {amount_obj}",
                 custom_entry
             ))
-            return new_entries, errors
+            continue
         
-        for i in range(0, len(values), 2):
-            amount_value = _extract_value(values[i])
-            currency = _extract_value(values[i + 1])
-            
-            # Convert amount to Decimal if it's not already
-            if isinstance(amount_value, str):
-                try:
-                    amount_value = D(amount_value)
-                except:
-                    errors.append(BalanceExtendedError(
-                        custom_entry.meta,
-                        f"Invalid amount value: {amount_value}",
-                        custom_entry
-                    ))
-                    continue
-            elif not isinstance(amount_value, Decimal):
-                try:
-                    amount_value = D(str(amount_value))
-                except:
-                    errors.append(BalanceExtendedError(
-                        custom_entry.meta,
-                        f"Invalid amount value: {amount_value}",
-                        custom_entry
-                    ))
-                    continue
-            
-            if not isinstance(currency, str):
-                errors.append(BalanceExtendedError(
-                    custom_entry.meta,
-                    f"Currency must be a string: {currency}",
-                    custom_entry
-                ))
-                continue
-            
-            explicit_currencies[currency] = amount_value
+        explicit_currencies[amount_obj.currency] = amount_obj.number
     
     # Determine which currencies to create balance assertions for
     currencies_to_assert = set(explicit_currencies.keys())
