@@ -214,6 +214,325 @@ class TestCurrenciesUsed(unittest.TestCase):
         open_entry = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Test")
         self.assertEqual(open_entry.meta['existing_key'], 'existing_value')
         self.assertEqual(open_entry.meta['currencies_used'], 'USD')
+    
+    def test_extend_open_directives_add_currencies(self):
+        """Test extend_open_directives adds currencies to Open directives with None currencies."""
+        entries = [
+            # Open directive with no currencies defined
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",
+                currencies=None,  # No currencies defined
+                booking=None
+            ),
+            # Transaction using multiple currencies
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                flag="*",
+                payee=None,
+                narration="USD transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Income:Salary",
+                        units=Amount(Decimal('-1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            ),
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 3),
+                flag="*",
+                payee=None,
+                narration="EUR transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Expenses:Other",
+                        units=Amount(Decimal('-500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            )
+        ]
+        
+        # Test with extend_open_directives enabled
+        config_str = "{'extend_open_directives': True}"
+        new_entries, errors = currencies_used(entries, {}, config_str)
+        
+        # Should have no errors
+        self.assertEqual(len(errors), 0)
+        
+        # Check that Open directive now has currencies defined
+        cash_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Cash")
+        self.assertEqual(cash_open.currencies, ["EUR", "USD"])  # Should be sorted
+        self.assertEqual(cash_open.meta['currencies_used'], "EUR, USD")
+    
+    def test_extend_open_directives_validate_currencies_match(self):
+        """Test extend_open_directives validates matching currencies without error."""
+        entries = [
+            # Open directive with currencies that match usage
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",
+                currencies=["USD", "EUR"],  # Matches what will be used
+                booking=None
+            ),
+            # Transactions using the same currencies
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                flag="*",
+                payee=None,
+                narration="USD transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Income:Salary",
+                        units=Amount(Decimal('-1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            ),
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 3),
+                flag="*",
+                payee=None,
+                narration="EUR transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Expenses:Other",
+                        units=Amount(Decimal('-500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            )
+        ]
+        
+        # Test with extend_open_directives enabled
+        config_str = "{'extend_open_directives': True}"
+        new_entries, errors = currencies_used(entries, {}, config_str)
+        
+        # Should have no errors since currencies match
+        self.assertEqual(len(errors), 0)
+        
+        # Open directive currencies should remain unchanged
+        cash_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Cash")
+        self.assertEqual(cash_open.currencies, ["USD", "EUR"])
+        self.assertEqual(cash_open.meta['currencies_used'], "EUR, USD")
+    
+    def test_extend_open_directives_validate_currencies_mismatch(self):
+        """Test extend_open_directives reports error when currencies don't match."""
+        entries = [
+            # Open directive with currencies that don't match usage
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",
+                currencies=["USD"],  # Only USD defined, but EUR will be used too
+                booking=None
+            ),
+            # Transactions using more currencies than defined
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                flag="*",
+                payee=None,
+                narration="USD transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Income:Salary",
+                        units=Amount(Decimal('-1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            ),
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 3),
+                flag="*",
+                payee=None,
+                narration="EUR transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Expenses:Other",
+                        units=Amount(Decimal('-500'), "EUR"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            )
+        ]
+        
+        # Test with extend_open_directives enabled
+        config_str = "{'extend_open_directives': True}"
+        new_entries, errors = currencies_used(entries, {}, config_str)
+        
+        # Should have one error for currency mismatch
+        self.assertEqual(len(errors), 1)
+        error = errors[0]
+        self.assertIn("Assets:Cash", error.message)
+        self.assertIn("defined currencies ['USD']", error.message)
+        self.assertIn("used currencies ['EUR', 'USD']", error.message)
+        
+        # Open directive currencies should remain unchanged
+        cash_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Cash")
+        self.assertEqual(cash_open.currencies, ["USD"])  # Original currencies preserved
+        self.assertEqual(cash_open.meta['currencies_used'], "EUR, USD")
+    
+    def test_config_disabled_no_extension(self):
+        """Test that without extend_open_directives config, behavior is unchanged."""
+        entries = [
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",
+                currencies=None,
+                booking=None
+            ),
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                flag="*",
+                payee=None,
+                narration="USD transaction",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Income:Salary",
+                        units=Amount(Decimal('-1000'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    )
+                ]
+            )
+        ]
+        
+        # Test without config (default behavior)
+        new_entries, errors = currencies_used(entries, {})
+        
+        # Should have no errors
+        self.assertEqual(len(errors), 0)
+        
+        # Open directive currencies should remain None (unchanged)
+        cash_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Cash")
+        self.assertIsNone(cash_open.currencies)
+        self.assertEqual(cash_open.meta['currencies_used'], "USD")
+    
+    def test_invalid_config_string(self):
+        """Test that invalid config string produces error."""
+        entries = [
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",
+                currencies=None,
+                booking=None
+            )
+        ]
+        
+        # Test with invalid config string
+        config_str = "invalid python syntax {"
+        new_entries, errors = currencies_used(entries, {}, config_str)
+        
+        # Should have one error for invalid config
+        self.assertEqual(len(errors), 1)
+        error = errors[0]
+        self.assertIn("Invalid configuration string", error.message)
+        
+        # Should return original entries unchanged
+        self.assertEqual(len(new_entries), 1)
+        self.assertEqual(new_entries[0], entries[0])
 
 if __name__ == '__main__':
     unittest.main()
