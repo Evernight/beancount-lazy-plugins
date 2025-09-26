@@ -147,16 +147,16 @@ def process_balance(custom_entry, account_currencies):
     
     # Determine expected format and minimum arguments based on type
     if balance_type == BalanceType.FULL:
-        min_args = 3  # balance_type + account + at least one amount
-        expected_format = "balance_type account amount1 amount2 ..."
+        min_args = 4  # balance_type + account + amount + currency (minimum)
+        expected_format = "balance_type account amount1 currency1"
         values_start_index = 2
     elif balance_type == BalanceType.PADDED:
-        min_args = 4  # balance_type + account + pad_account + at least one amount
-        expected_format = "balance_type account pad_account amount1 amount2 ..."
+        min_args = 5  # balance_type + account + pad_account + amount + currency (minimum)
+        expected_format = "balance_type account pad_account amount1 currency1"
         values_start_index = 3
     elif balance_type == BalanceType.FULL_PADDED:
-        min_args = 4  # balance_type + account + pad_account + at least one amount
-        expected_format = "balance_type account pad_account amount1 amount2 ..."
+        min_args = 5  # balance_type + account + pad_account + amount + currency (minimum)
+        expected_format = "balance_type account pad_account amount1 currency1"
         values_start_index = 3
     else:
         raise ValueError(f"Invalid balance_type: {balance_type}")
@@ -271,8 +271,8 @@ def process_balance(custom_entry, account_currencies):
     # Determine which currencies to create balance assertions for
     currencies_to_assert = set(explicit_currencies.keys())
     
-    # For "full" and "full-padded" balance types, add all currencies from the account's Open directive
-    if balance_type == BalanceType.FULL or balance_type == BalanceType.FULL_PADDED:
+    # For "full", "padded", and "full-padded" balance types, add all currencies from the account's Open directive
+    if balance_type in (BalanceType.FULL, BalanceType.PADDED, BalanceType.FULL_PADDED):
         account_declared_currencies = account_currencies.get(account, set())
         currencies_to_assert.update(account_declared_currencies)
     
