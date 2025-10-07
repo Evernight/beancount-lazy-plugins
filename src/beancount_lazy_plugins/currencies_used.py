@@ -84,7 +84,7 @@ def currencies_used(entries, options_map, config_str=None):
                 else:
                     # Currencies are defined, validate they match
                     defined_currencies = set(entry.currencies)
-                    if defined_currencies != used_currencies:
+                    if not used_currencies.issubset(defined_currencies):
                         # Create error for mismatch
                         defined_sorted = sorted(list(defined_currencies))
                         used_sorted = sorted(list(used_currencies))
