@@ -79,6 +79,9 @@ def currency_convert(entries, options_map, config_str=None):
                                 # Use inverse rate
                                 exchange_rate = Decimal(1) / inverse_price_info[1]
                                 converted_amount = posting.units.number * exchange_rate
+                                # Set per-unit price in terms of the original currency so that
+                                # converted amount can be traced back to the source currency.
+                                new_price = Amount(Decimal(1) / exchange_rate, source_currency)
                                 
                                 # Create new posting with converted amount and updated metadata
                                 new_meta = dict(posting.meta) if posting.meta else {}
@@ -90,7 +93,7 @@ def currency_convert(entries, options_map, config_str=None):
                                     account=posting.account,
                                     units=Amount(converted_amount, target_currency),
                                     cost=posting.cost,
-                                    price=posting.price,
+                                    price=new_price,
                                     flag=posting.flag,
                                     meta=new_meta if new_meta else None
                                 )
@@ -100,6 +103,9 @@ def currency_convert(entries, options_map, config_str=None):
                             # Use direct rate
                             exchange_rate = price_info[1]
                             converted_amount = posting.units.number * exchange_rate
+                            # Set per-unit price in terms of the original currency so that
+                            # converted amount can be traced back to the source currency.
+                            new_price = Amount(Decimal(1) / exchange_rate, source_currency)
                             
                             # Create new posting with converted amount and updated metadata
                             new_meta = dict(posting.meta) if posting.meta else {}
@@ -111,7 +117,7 @@ def currency_convert(entries, options_map, config_str=None):
                                 account=posting.account,
                                 units=Amount(converted_amount, target_currency),
                                 cost=posting.cost,
-                                price=posting.price,
+                                price=new_price,
                                 flag=posting.flag,
                                 meta=new_meta if new_meta else None
                             )
