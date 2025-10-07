@@ -3,7 +3,7 @@
 import unittest
 from decimal import Decimal
 from beancount.core import data
-from beancount.core.data import Amount, Open, Transaction, Posting
+from beancount.core.data import Amount, Open, Transaction, Posting, Pad, Balance
 from beancount_lazy_plugins.currencies_used import currencies_used
 import datetime
 
@@ -214,6 +214,84 @@ class TestCurrenciesUsed(unittest.TestCase):
         open_entry = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Test")
         self.assertEqual(open_entry.meta['existing_key'], 'existing_value')
         self.assertEqual(open_entry.meta['currencies_used'], 'USD')
+
+    def test_extend_from_pad_directives_propagates_currencies_from_padded_account(self):
+        """Currencies from padded account should extend to source_account; Balance currencies are included."""
+        entries = [
+            # Open directives for padded and source accounts
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Assets:Cash",  # Padded account
+                currencies=None,
+                booking=None
+            ),
+            Open(
+                meta={},
+                date=datetime.date(2020, 1, 1),
+                account="Equity:Opening-Balances",  # Source account
+                currencies=None,
+                booking=None
+            ),
+            # A transaction that establishes USD usage on the padded account
+            Transaction(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                flag="*",
+                payee=None,
+                narration="Seed USD on padded account",
+                tags=None,
+                links=None,
+                postings=[
+                    Posting(
+                        account="Assets:Cash",
+                        units=Amount(Decimal('100'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                    Posting(
+                        account="Income:Other",
+                        units=Amount(Decimal('-100'), "USD"),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None
+                    ),
+                ],
+            ),
+            # Pad directive linking padded account to source account
+            Pad(
+                meta={},
+                date=datetime.date(2020, 1, 2),
+                account="Assets:Cash",
+                source_account="Equity:Opening-Balances",
+            ),
+            # Balance directive on source account in EUR should contribute EUR
+            Balance(
+                meta={},
+                date=datetime.date(2020, 1, 3),
+                account="Equity:Opening-Balances",
+                amount=Amount(Decimal('10'), "EUR"),
+                tolerance=None,
+                diff_amount=None,
+            ),
+        ]
+
+        config_str = "{'extend_from_pad_directives': True}"
+        new_entries, errors = currencies_used(entries, {}, config_str)
+
+        # No errors expected
+        self.assertEqual(len(errors), 0)
+
+        # The padded account should include USD as usual
+        cash_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Assets:Cash")
+        self.assertEqual(cash_open.meta.get('currencies_used'), 'USD')
+
+        # The source account should include USD via Pad and EUR via Balance (sorted)
+        source_open = next(e for e in new_entries if isinstance(e, Open) and e.account == "Equity:Opening-Balances")
+        self.assertEqual(source_open.meta.get('currencies_used'), 'EUR, USD')
     
     def test_extend_open_directives_add_currencies(self):
         """Test extend_open_directives adds currencies to Open directives with None currencies."""

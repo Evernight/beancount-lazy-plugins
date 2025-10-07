@@ -9,6 +9,10 @@ When configured with 'extend_open_directives', it can also extend Open directive
 with the actual currencies used:
 - If currencies are not defined in Open directive, add the found used currencies
 - If currencies are defined, validate they match the used currencies and report errors if not
+
+When configured with 'extend_from_pad_directives', it additionally extends the set of
+currencies by propagating currencies used in a padded account to its source_account
+for each Pad directive in the ledger.
 """
 
 import collections
@@ -48,22 +52,35 @@ def currencies_used(entries, options_map, config_str=None):
             return entries, errors
     
     extend_open_directives = config.get('extend_open_directives', False)
+    extend_from_pad_directives = config.get('extend_from_pad_directives', True)
     
     # Track currencies used per account
     account_currencies = collections.defaultdict(set)
     
-    # First pass: collect all currencies used per account from transactions
+    # First pass: collect all currencies used per account from transactions and balances
     for entry in entries:
-        if isinstance(entry, Transaction):
+        if isinstance(entry, data.Transaction):
             for posting in entry.postings:
-                if posting.units and posting.units.currency:
+                if posting.units is not None and posting.units.currency:
                     account_currencies[posting.account].add(posting.units.currency)
+        elif isinstance(entry, data.Balance):
+            if entry.amount is not None and entry.amount.currency:
+                account_currencies[entry.account].add(entry.amount.currency)
     
+    # Optional step: extend currencies from Pad directives (padded account -> source_account)
+    if extend_from_pad_directives:
+        for entry in entries:
+            if isinstance(entry, data.Pad):
+                padded_account = entry.account
+                source_account = entry.source_account
+                if padded_account in account_currencies:
+                    account_currencies[source_account].update(account_currencies[padded_account])
+
     # Second pass: update Open directives with currencies_used metadata
     new_entries = []
     
     for entry in entries:
-        if isinstance(entry, Open):
+        if isinstance(entry, data.Open):
             account = entry.account
             used_currencies = account_currencies.get(account, set())
             
@@ -96,7 +113,7 @@ def currencies_used(entries, options_map, config_str=None):
                         ))
             
             # Create new Open directive
-            new_open = Open(
+            new_open = data.Open(
                 meta=new_meta,
                 date=entry.date,
                 account=entry.account,
