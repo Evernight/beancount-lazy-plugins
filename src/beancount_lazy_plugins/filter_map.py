@@ -24,6 +24,8 @@ class OperationParams(Enum):
 
     ADD_TAGS = "addTags"
     ADD_META = "addMeta"
+    SET_PAYEE = "setPayee"
+    SET_NARRATION = "setNarration"
 
 
 ALL_OPERATION_PARAMS = [
@@ -32,6 +34,8 @@ ALL_OPERATION_PARAMS = [
     OperationParams.ADVANCED,
     OperationParams.ADD_TAGS,
     OperationParams.ADD_META,
+    OperationParams.SET_PAYEE,
+    OperationParams.SET_NARRATION,
 ]
 
 __plugins__ = ["filter_map"]
@@ -48,6 +52,8 @@ class OperationConfig:
 
     addTags: Optional[str] = None
     addMeta: Optional[str] = None
+    setPayee: Optional[str] = None
+    setNarration: Optional[str] = None
     filters: List[Any] = field(default_factory=list)
     tagValues: List[str] = field(default_factory=list)
     times_applied: int = 0  # Track how many times this filter was applied
@@ -150,13 +156,22 @@ def filter_map(entries, options_map, config_str=None):
                 if op.addMeta:
                     new_meta_dict = ast.literal_eval(op.addMeta)
                     new_meta.update(new_meta_dict)
+                
+                # Handle SET_PAYEE and SET_NARRATION operations
+                new_payee = new_entry.payee
+                if op.setPayee:
+                    new_payee = op.setPayee
+                
+                new_narration = new_entry.narration
+                if op.setNarration:
+                    new_narration = op.setNarration
 
                 transaction = Transaction(
                     new_meta,
                     new_entry.date,
                     flag=new_entry.flag,
-                    payee=new_entry.payee,
-                    narration=new_entry.narration,
+                    payee=new_payee,
+                    narration=new_narration,
                     tags=new_tags,
                     links=new_entry.links,
                     postings=new_entry.postings,
