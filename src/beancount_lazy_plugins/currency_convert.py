@@ -19,6 +19,7 @@ CurrencyConvertError = collections.namedtuple(
 )
 
 CONVERT_TO_METADATA_KEY = "convert_to"
+AT_TODAY_PRICE_METADATA_KEY = "at_today_price_in"
 
 def currency_convert(entries, options_map, config_str=None):
     """Convert postings based on convert_to metadata.
@@ -44,6 +45,7 @@ def currency_convert(entries, options_map, config_str=None):
             for posting in entry.postings:
                 # Check if this posting has convert_to metadata
                 convert_to = posting.meta.get(CONVERT_TO_METADATA_KEY) if posting.meta else None
+                at_today_price = posting.meta.get(AT_TODAY_PRICE_METADATA_KEY) if posting.meta else None
                 
                 if convert_to and posting.units:
                     # Get the source currency from the posting
@@ -123,8 +125,65 @@ def currency_convert(entries, options_map, config_str=None):
                             )
                             new_postings.append(new_posting)
                             transaction_modified = True
+                elif at_today_price and posting.units:
+                    source_currency = posting.units.currency
+                    target_currency = at_today_price
+                    if source_currency == target_currency:
+                        # No pricing needed, just remove the metadata
+                        new_meta = dict(posting.meta) if posting.meta else {}
+                        new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
+                        new_posting = posting._replace(meta=new_meta if new_meta else None)
+                        new_postings.append(new_posting)
+                        transaction_modified = True
+                    else:
+                        # Look up the price at the transaction date
+                        currency_pair = (source_currency, target_currency)
+                        price_info = prices.get_price(price_map, currency_pair, entry.date)
+                        if price_info[1] is None:
+                            # Try inverse
+                            inverse_pair = (target_currency, source_currency)
+                            inverse_price_info = prices.get_price(price_map, inverse_pair, entry.date)
+                            if inverse_price_info[1] is None:
+                                # No price found; keep original and record error
+                                errors.append(CurrencyConvertError(
+                                    posting.meta or {},
+                                    f"No price found for pricing {source_currency} in {target_currency} on {entry.date}",
+                                    entry
+                                ))
+                                new_postings.append(posting)
+                            else:
+                                # Use inverse
+                                exchange_rate = Decimal(1) / inverse_price_info[1]
+                                new_price = Amount(exchange_rate, target_currency)
+                                new_meta = dict(posting.meta) if posting.meta else {}
+                                new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
+                                new_posting = Posting(
+                                    account=posting.account,
+                                    units=posting.units,
+                                    cost=posting.cost,
+                                    price=new_price,
+                                    flag=posting.flag,
+                                    meta=new_meta if new_meta else None
+                                )
+                                new_postings.append(new_posting)
+                                transaction_modified = True
+                        else:
+                            exchange_rate = price_info[1]
+                            new_price = Amount(exchange_rate, target_currency)
+                            new_meta = dict(posting.meta) if posting.meta else {}
+                            new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
+                            new_posting = Posting(
+                                account=posting.account,
+                                units=posting.units,
+                                cost=posting.cost,
+                                price=new_price,
+                                flag=posting.flag,
+                                meta=new_meta if new_meta else None
+                            )
+                            new_postings.append(new_posting)
+                            transaction_modified = True
                 else:
-                    # No conversion needed, keep original posting
+                    # No conversion or pricing needed, keep original posting
                     new_postings.append(posting)
             
             if transaction_modified:
