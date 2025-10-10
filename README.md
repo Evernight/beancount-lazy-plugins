@@ -169,6 +169,18 @@ Can be used in combination with the [beancount_interpolate](https://github.com/A
 
 Let's consider example 3 again. For each trip you want to describe it's likely that the filter field is going to be the same. To avoid repeating it for all trips you can save it (or any combination of fields, really) to reuse as a preset in other filters. 
 
+### Example 6: renaming/mapping unclear merchant names
+```
+2021-01-01 custom "filter-map" "apply"
+    filter: "payee:'SomeService.*'"
+    setPayee: "Some Service"
+
+2021-01-01 custom "filter-map" "apply"
+    filter: "payee:'SmService Llc.*'"
+    setPayee: "Some Service"
+```
+When some of the auto-imported merchant names do not make sense or are displayed differently in different transactions or banks, you may map them to something more understandable for you and useful for search / grouping in Fava and dashboards.
+
 ## auto_accounts
 A Beancount plugin that automatically inserts Open directives for accounts not opened (at the date of the first entry). Slightly improved version of the plugin supplied with Beancount by default. Reports all auto-opened accounts and adds metadata to Open directives. This allows to have the convenience of auto-opening accounts but avoiding accidental mistakes in the ledger.
 
