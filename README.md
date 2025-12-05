@@ -12,6 +12,7 @@ Set of plugins for lazy (or not so) people used by [lazy-beancount](https://gith
 * [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
 * [generate_base_ccy_prices](#generate_base_ccy_prices): generate base currency prices for all currencies in the ledger (based on the original from [tariochbctools](https://github.com/tarioch/beancounttools/blob/master/src/tariochbctools/plugins/generate_base_ccy_prices.py
 ))
+* [generate_inverse_prices](#generate_inverse_prices): automatically generate inverse price directives for all existing prices
 * [currency_convert](#currency_convert): convert posting amounts to different currencies using price data
 * [expense_merchant_map](#expense_merchant_map): automatically extend expense account names to include merchant names
 
@@ -263,6 +264,29 @@ plugin "beancount.ops.pad"
 plugin "beancount.ops.balance"
 
 plugin "beancount_lazy_plugins.group_pad_transactions"
+```
+
+## generate_inverse_prices
+A Beancount plugin that automatically generates inverse price directives for all existing prices in your ledger.
+
+### Usage
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.generate_inverse_prices"
+```
+
+### Example
+If your ledger contains:
+```
+2024-01-01 price USD 0.85 EUR
+2024-01-15 price USD 0.87 EUR
+```
+
+The plugin will automatically generate the inverse prices:
+```
+2024-01-01 price EUR 1.176470588 USD
+2024-01-15 price EUR 1.149425287 USD
 ```
 
 ## balance_extended

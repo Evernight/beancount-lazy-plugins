@@ -12,7 +12,7 @@ __plugins__ = ["generate"]
 def generate(entries, options_map, baseCcy):
     errors = []
     priceMap = prices.build_price_map(entries)
-    existingDates = defaultdict(None)
+    existingDates = defaultdict[tuple[str,str], set](None)
 
     additionalEntries = []
     for entry in entries:
