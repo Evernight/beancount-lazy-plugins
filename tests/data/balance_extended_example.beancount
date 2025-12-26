@@ -14,6 +14,7 @@ plugin "beancount_lazy_plugins.balance_extended"
 
 ; Example 2: balance padded operation  
 ; This will create a pad directive on 2015-01-31 and balance assertions on 2015-02-01
+; Note: "padded" does not expand to all currencies declared in the account's open directive.
 2015-02-01 custom "balance-ext" "padded" Assets:Checking Equity:Opening-Balances 150 EUR 300 USD
 
 ; Some transactions to make the example more realistic

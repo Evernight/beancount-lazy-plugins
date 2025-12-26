@@ -399,7 +399,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, self.options_map)
         
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 6)  # 1 open + 2 balance full + 1 pad + 1 balance padded
+        self.assertEqual(len(new_entries), 5)  # 1 open + 2 balance full + 1 pad + 1 balance padded
         
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], open_entry)
@@ -452,7 +452,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(balance_assertions[2].amount, amount.Amount(D("100"), "USD"))
 
     def test_balance_padded_with_zero_currencies(self):
-        """Test balance padded creates zero balance assertions for missing currencies."""
+        """Test balance padded does not create zero balance assertions for missing currencies."""
         meta = data.new_metadata("test.beancount", 1)
         
         # Open account with multiple currencies
@@ -481,7 +481,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, self.options_map)
         
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 5)  # 1 open + 1 pad + 3 balance assertions
+        self.assertEqual(len(new_entries), 3)  # 1 open + 1 pad + 1 balance assertion
         
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], open_entry)
@@ -493,12 +493,8 @@ class TestBalanceExtended(unittest.TestCase):
         
         # Check balance assertions - should be sorted by currency
         balance_assertions = [e for e in new_entries[2:] if isinstance(e, data.Balance)]
-        self.assertEqual(len(balance_assertions), 3)
-        
-        # Should be sorted: CAD (0), EUR (50), USD (0)
-        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("0"), "CAD"))
-        self.assertEqual(balance_assertions[1].amount, amount.Amount(D("50"), "EUR"))
-        self.assertEqual(balance_assertions[2].amount, amount.Amount(D("0"), "USD"))
+        self.assertEqual(len(balance_assertions), 1)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("50"), "EUR"))
 
     def test_balance_full_no_open_directive(self):
         """Test balance full when account has no Open directive."""

@@ -8,7 +8,8 @@ This plugin implements balance operations with a type parameter:
    in the balance directive, creates balance assertions with amount 0.
    Example: 2015-01-01 custom "balance-ext" "full" Account 100 EUR 230 USD
    
-2. balance padded: Same as balance full but also generates pad directives on day-1
+2. balance padded: Generates pad directives on day-1, and creates balance assertions
+   only for currencies explicitly provided in the directive.
    Example: 2015-01-01 custom "balance-ext" "padded" Account PadAccount 100 EUR 230 USD
 
 3. balance full-padded: Combines full and padded behavior - asserts all declared currencies
@@ -214,8 +215,9 @@ def process_balance(custom_entry, account_currencies):
     # Determine which currencies to create balance assertions for
     currencies_to_assert = set(explicit_currencies.keys())
     
-    # For "full", "padded", and "full-padded" balance types, add all currencies from the account's Open directive
-    if balance_type in (BalanceType.FULL, BalanceType.PADDED, BalanceType.FULL_PADDED):
+    # For "full" and "full-padded" balance types, add all currencies from the account's Open directive.
+    # For "padded", only assert currencies explicitly provided in the directive.
+    if balance_type in (BalanceType.FULL, BalanceType.FULL_PADDED):
         account_declared_currencies = account_currencies.get(account, set())
         currencies_to_assert.update(account_declared_currencies)
     

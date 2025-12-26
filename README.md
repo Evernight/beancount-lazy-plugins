@@ -292,7 +292,7 @@ The plugin will automatically generate the inverse prices:
 ## balance_extended
 A Beancount plugin that adds custom balance operations with a type parameter. It helps you:
 - **full**: Expand a balance assertion into separate per-currency assertions. For currencies declared in the account's `open` directive but not listed in the custom, a zero balance assertion is generated.
-- **padded**: Same as "full" but also creates a `pad` directive on day-1 from a specified pad account.
+- **padded**: Creates a `pad` directive on day-1 from a specified pad account, and asserts only the currencies explicitly listed in the directive (does not expand to all declared currencies).
 - **full-padded**: Combines both behaviors.
 
 ### Usage
@@ -314,7 +314,7 @@ Then use one of the supported custom directives:
 ; 1) full — per-currency balance assertions; missing declared currencies default to 0
 2015-01-01 custom "balance-ext" "full" Assets:Bank:Savings  100 EUR  230 USD
 
-; 2) padded — like full, and also generates `pad` on previous day from a pad account
+; 2) padded — generates `pad` on previous day from a pad account; asserts only explicitly listed currencies
 2015-01-01 custom "balance-ext" "padded" Assets:Bank:Savings Equity:Opening-Balances  100 EUR  230 USD
 
 ; 3) full-padded — combines full and padded
