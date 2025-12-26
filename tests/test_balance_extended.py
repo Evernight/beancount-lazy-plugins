@@ -9,7 +9,12 @@ from decimal import Decimal
 from beancount.core import data
 from beancount.core import amount
 from beancount.core.number import D
+from beancount.parser.grammar import ValueType
 from beancount_lazy_plugins.balance_extended import balance_extended, BalanceExtendedError, BalanceType
+
+
+def wrap_values(*values):
+    return [ValueType(value, type(value)) for value in values]
 
 
 class TestBalanceExtended(unittest.TestCase):
@@ -26,7 +31,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
+            values=wrap_values("full", "Assets:Checking", amount.Amount(D("100"), "USD"))
         )
         
         entries = [custom_entry]
@@ -48,7 +53,12 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
+            values=wrap_values(
+                "full",
+                "Assets:Checking",
+                amount.Amount(D("100"), "EUR"),
+                amount.Amount(D("230"), "USD"),
+            )
         )
         
         entries = [custom_entry]
@@ -78,7 +88,12 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD")]
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+            )
         )
         
         entries = [custom_entry]
@@ -108,7 +123,13 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "EUR"),
+                amount.Amount(D("230"), "USD"),
+            )
         )
         
         entries = [custom_entry]
@@ -145,7 +166,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100.50"), "USD")]
+            values=wrap_values("full", "Assets:Checking", amount.Amount(D("100.50"), "USD"))
         )
         
         entries = [custom_entry]
@@ -165,7 +186,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking"]  # Missing amount and currency
+            values=wrap_values("full", "Assets:Checking")  # Missing amount and currency
         )
         
         entries = [custom_entry]
@@ -183,7 +204,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD"), D("200")]  # Invalid: raw Decimal instead of Amount
+            values=wrap_values("full", "Assets:Checking", amount.Amount(D("100"), "USD"), D("200"))  # Invalid: raw Decimal instead of Amount
         )
         
         entries = [custom_entry]
@@ -201,7 +222,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances"]  # Missing amount and currency
+            values=wrap_values("padded", "Assets:Checking", "Equity:Opening-Balances")  # Missing amount and currency
         )
         
         entries = [custom_entry]
@@ -219,7 +240,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", 123, D("100"), "USD"]  # Account should be string
+            values=wrap_values("full", 123, D("100"), "USD")  # Account should be string
         )
         
         entries = [custom_entry]
@@ -237,7 +258,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", "invalid"]  # String instead of Amount object
+            values=wrap_values("full", "Assets:Checking", "invalid")  # String instead of Amount object
         )
         
         entries = [custom_entry]
@@ -255,7 +276,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", 123]  # Integer instead of Amount object
+            values=wrap_values("full", "Assets:Checking", 123)  # Integer instead of Amount object
         )
         
         entries = [custom_entry]
@@ -273,7 +294,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["invalid", "Assets:Checking", D("100"), "USD"]  # Invalid balance type
+            values=wrap_values("invalid", "Assets:Checking", D("100"), "USD")  # Invalid balance type
         )
         
         entries = [custom_entry]
@@ -292,7 +313,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=[123, "Assets:Checking", D("100"), "USD"]  # Balance type should be string
+            values=wrap_values(123, "Assets:Checking", D("100"), "USD")  # Balance type should be string
         )
         
         entries = [custom_entry]
@@ -310,7 +331,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="other-custom",
-            values=["some", "values"]
+            values=wrap_values("some", "values")
         )
         
         entries = [other_custom]
@@ -354,14 +375,24 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "EUR"), amount.Amount(D("230"), "USD")]
+            values=wrap_values(
+                "full",
+                "Assets:Checking",
+                amount.Amount(D("100"), "EUR"),
+                amount.Amount(D("230"), "USD"),
+            )
         )
         
         balance_padded_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 2, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("150"), "EUR")]
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("150"), "EUR"),
+            )
         )
         
         entries = [open_entry, balance_full_entry, balance_padded_entry]
@@ -399,7 +430,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
+            values=wrap_values("full", "Assets:Checking", amount.Amount(D("100"), "USD"))
         )
         
         entries = [open_entry, balance_entry]
@@ -438,7 +469,12 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("50"), "EUR")]
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("50"), "EUR"),
+            )
         )
         
         entries = [open_entry, balance_entry]
@@ -473,7 +509,12 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Unknown", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
+            values=wrap_values(
+                "full",
+                "Assets:Unknown",
+                amount.Amount(D("100"), "USD"),
+                amount.Amount(D("50"), "EUR"),
+            )
         )
         
         entries = [balance_entry]
@@ -507,7 +548,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full", "Assets:Checking", amount.Amount(D("100"), "USD")]
+            values=wrap_values("full", "Assets:Checking", amount.Amount(D("100"), "USD"))
         )
         
         entries = [open_entry, balance_entry]
@@ -560,7 +601,7 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="other",
-            values=["test"]
+            values=wrap_values("test")
         )
         
         entries = [open1, open2, open3, other_entry]
@@ -592,7 +633,12 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD")]
+            values=wrap_values(
+                "full-padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+            )
         )
         
         entries = [open_entry, balance_entry]
@@ -637,7 +683,13 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Checking", "Equity:Opening-Balances", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
+            values=wrap_values(
+                "full-padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+                amount.Amount(D("50"), "EUR"),
+            )
         )
         
         entries = [open_entry, balance_entry]
@@ -674,7 +726,13 @@ class TestBalanceExtended(unittest.TestCase):
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=["full-padded", "Assets:Unknown", "Equity:Opening-Balances", amount.Amount(D("100"), "USD"), amount.Amount(D("50"), "EUR")]
+            values=wrap_values(
+                "full-padded",
+                "Assets:Unknown",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+                amount.Amount(D("50"), "EUR"),
+            )
         )
         
         entries = [balance_entry]

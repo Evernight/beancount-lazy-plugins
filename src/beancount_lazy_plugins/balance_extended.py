@@ -95,16 +95,6 @@ def build_account_currencies_mapping(entries):
     return account_currencies
 
 
-def _extract_value(value_wrapper):
-    """Extract the actual value from a ValueType wrapper or return the value directly.
-    
-    This handles both parsed values (wrapped in ValueType) and direct values (from tests).
-    """
-    if hasattr(value_wrapper, 'value'):
-        return value_wrapper.value
-    return value_wrapper
-
-
 def process_balance(custom_entry, account_currencies):
     """Common logic for processing balance custom operations.
     
@@ -126,7 +116,7 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    balance_type_str = _extract_value(custom_entry.values[0])
+    balance_type_str = custom_entry.values[0].value
     if not isinstance(balance_type_str, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -170,7 +160,7 @@ def process_balance(custom_entry, account_currencies):
         ))
         return new_entries, errors
     
-    account = _extract_value(custom_entry.values[1])
+    account = custom_entry.values[1].value
     if not isinstance(account, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -181,7 +171,7 @@ def process_balance(custom_entry, account_currencies):
     
     # Handle pad account for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
-        pad_account = _extract_value(custom_entry.values[2])
+        pad_account = custom_entry.values[2].value
         if not isinstance(pad_account, str):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
@@ -208,7 +198,7 @@ def process_balance(custom_entry, account_currencies):
     
     # Handle Amount objects (Beancount parses amounts as Amount objects)
     for value_wrapper in values:
-        amount_obj = _extract_value(value_wrapper)
+        amount_obj = value_wrapper.value
         
         # Verify it's an Amount object
         if not isinstance(amount_obj, amount.Amount):
