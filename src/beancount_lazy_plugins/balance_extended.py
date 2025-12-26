@@ -23,6 +23,7 @@ import collections
 import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import NamedTuple
 
 from beancount.core import data
 from beancount.core import amount
@@ -41,6 +42,12 @@ BalanceExtendedError = collections.namedtuple(
 )
 
 
+class PadKey(NamedTuple):
+    date: datetime.date
+    account: str
+    source_account: str
+
+
 def balance_extended(entries, options_map, config_str=None):
     """Process balance custom operations with type parameter.
     
@@ -54,6 +61,13 @@ def balance_extended(entries, options_map, config_str=None):
     """
     errors = []
     new_entries = []
+
+    # Track Pad directives (both pre-existing and created by this plugin run) so we don't
+    # emit duplicates for the same (date, account, source_account).
+    existing_pad_keys: set[PadKey] = set()
+    for entry in entries:
+        if isinstance(entry, data.Pad):
+            existing_pad_keys.add(PadKey(entry.date, entry.account, entry.source_account))
     
     # Build mapping of account currencies from Open directives
     account_currencies = build_account_currencies_mapping(entries)
@@ -62,7 +76,9 @@ def balance_extended(entries, options_map, config_str=None):
         if isinstance(entry, data.Custom):
             if entry.type == "balance-ext":
                 # Process balance custom operation
-                balance_entries, entry_errors = process_balance(entry, account_currencies)
+                balance_entries, entry_errors = process_balance(
+                    entry, account_currencies, existing_pad_keys
+                )
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
             else:
@@ -96,12 +112,13 @@ def build_account_currencies_mapping(entries):
     return account_currencies
 
 
-def process_balance(custom_entry, account_currencies):
+def process_balance(custom_entry, account_currencies, existing_pad_keys):
     """Common logic for processing balance custom operations.
     
     Args:
       custom_entry: A Custom directive with type "balance-ext"
       account_currencies: Dictionary mapping account names to sets of currencies
+      existing_pad_keys: A mutable set of already-seen pad keys to avoid duplicates
     Returns:
       A tuple of (list of new entries, list of errors)
     """
@@ -183,13 +200,16 @@ def process_balance(custom_entry, account_currencies):
         
         # Create pad directive on day-1
         pad_date = custom_entry.date - datetime.timedelta(days=1)
-        pad_entry = data.Pad(
-            meta=data.new_metadata("<balance_extended>", 0),
-            date=pad_date,
-            account=account,
-            source_account=pad_account
-        )
-        new_entries.append(pad_entry)
+        pad_key = PadKey(pad_date, account, pad_account)
+        if pad_key not in existing_pad_keys:
+            pad_entry = data.Pad(
+                meta=data.new_metadata("<balance_extended>", 0),
+                date=pad_date,
+                account=account,
+                source_account=pad_account
+            )
+            new_entries.append(pad_entry)
+            existing_pad_keys.add(pad_key)
     
     # Parse amount values (Beancount parses amounts as Amount objects)
     values = custom_entry.values[values_start_index:]

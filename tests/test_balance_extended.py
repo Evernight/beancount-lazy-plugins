@@ -116,6 +116,79 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(balance_entry.amount, amount.Amount(D("100"), "USD"))
         self.assertEqual(balance_entry.date, datetime.date(2015, 1, 1))
 
+    def test_balance_padded_does_not_create_duplicate_pad_for_same_key(self):
+        """If multiple balance-ext padded directives would create the same Pad, emit it once."""
+        meta = data.new_metadata("test.beancount", 1)
+        custom_entry_1 = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance-ext",
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+            )
+        )
+        custom_entry_2 = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance-ext",
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("150"), "USD"),
+            )
+        )
+
+        entries = [custom_entry_1, custom_entry_2]
+        new_entries, errors = balance_extended(entries, self.options_map)
+
+        self.assertEqual(len(errors), 0)
+        pads = [e for e in new_entries if isinstance(e, data.Pad)]
+        balances = [e for e in new_entries if isinstance(e, data.Balance)]
+
+        self.assertEqual(len(pads), 1)
+        self.assertEqual(pads[0].account, "Assets:Checking")
+        self.assertEqual(pads[0].source_account, "Equity:Opening-Balances")
+        self.assertEqual(pads[0].date, datetime.date(2014, 12, 31))  # day-1
+
+        # Both directives should still produce their balance assertion.
+        self.assertEqual(len(balances), 2)
+        self.assertEqual(balances[0].amount.currency, "USD")
+        self.assertEqual(balances[1].amount.currency, "USD")
+
+    def test_balance_padded_does_not_create_pad_if_it_already_exists(self):
+        """If a matching Pad already exists in the input entries, do not create another one."""
+        meta = data.new_metadata("test.beancount", 1)
+
+        existing_pad = data.Pad(
+            meta=meta,
+            date=datetime.date(2014, 12, 31),
+            account="Assets:Checking",
+            source_account="Equity:Opening-Balances",
+        )
+        custom_entry = data.Custom(
+            meta=meta,
+            date=datetime.date(2015, 1, 1),
+            type="balance-ext",
+            values=wrap_values(
+                "padded",
+                "Assets:Checking",
+                "Equity:Opening-Balances",
+                amount.Amount(D("100"), "USD"),
+            )
+        )
+
+        entries = [existing_pad, custom_entry]
+        new_entries, errors = balance_extended(entries, self.options_map)
+
+        self.assertEqual(len(errors), 0)
+        pads = [e for e in new_entries if isinstance(e, data.Pad)]
+        self.assertEqual(len(pads), 1)
+        self.assertEqual(pads[0], existing_pad)
+
     def test_balance_padded_multiple_currencies(self):
         """Test balance padded with multiple currencies."""
         meta = data.new_metadata("test.beancount", 1)
