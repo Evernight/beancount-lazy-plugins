@@ -9,12 +9,13 @@ Set of plugins for lazy (or not so) people used by [lazy-beancount](https://gith
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 * [balance_extended](#balance_extended): adds extended balance assertions (full, padded, full-padded)
-* [auto_accounts](#auto_accounts): automatically insert Open directives for accounts not opened
+* [auto_accounts](#auto_accounts): insert Open directives for accounts not opened
 * [generate_base_ccy_prices](#generate_base_ccy_prices): generate base currency prices for all currencies in the ledger (based on the original from [tariochbctools](https://github.com/tarioch/beancounttools/blob/master/src/tariochbctools/plugins/generate_base_ccy_prices.py
 ))
-* [generate_inverse_prices](#generate_inverse_prices): automatically generate inverse price directives for all existing prices
+* [generate_inverse_prices](#generate_inverse_prices): generate inverse price directives for all existing prices
 * [currency_convert](#currency_convert): convert posting amounts to different currencies using price data
-* [expense_merchant_map](#expense_merchant_map): automatically extend expense account names to include merchant names
+* [expense_merchant_map](#expense_merchant_map): extend expense account names to include merchant names
+* [tag_from_continuous_events](#tag_from_continuous_events): apply tags to transactions based on Events
 
 ## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
