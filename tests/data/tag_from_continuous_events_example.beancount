@@ -1,12 +1,14 @@
 plugin "beancount_lazy_plugins.tag_from_continuous_events"
 
 2021-01-01 custom "tag-from-continuous-events" "config"
+  filter: "-any(account:'Expenses:Shopping:Online')"
   name: "location"
   tags: "location-{value}"
 
 1970-01-01 open Assets:Cash GBP
 1970-01-01 open Expenses:Food GBP
 1970-01-01 open Expenses:Entertainment GBP
+1970-01-01 open Expenses:Shopping:Online GBP
 
 2024-01-01 event "location" "London"
 2024-05-03 event "location" "Bangkok"
@@ -20,4 +22,6 @@ plugin "beancount_lazy_plugins.tag_from_continuous_events"
   Assets:Cash          -25 GBP
   Expenses:Entertainment
 
-
+2024-02-15 * "Online shopping"
+  Assets:Cash          -50 GBP
+  Expenses:Shopping:Online

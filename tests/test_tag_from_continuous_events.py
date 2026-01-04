@@ -19,12 +19,15 @@ def test_tag_from_continuous_events_example_ledger():
         pytest.fail(f"Failed to load test ledger: {errors}")
 
     txns = [e for e in entries if isinstance(e, Transaction)]
-    assert len(txns) == 2
+    assert len(txns) == 3
 
-    coffee = txns[0]
-    museum = txns[1]
+    by_narration = {t.narration: t for t in txns}
+    coffee = by_narration["Coffee"]
+    museum = by_narration["Museum tickets"]
+    shopping = by_narration["Online shopping"]
 
     assert "location-London" in coffee.tags
     assert "location-Bangkok" in museum.tags
+    assert "location-London" not in shopping.tags
 
 

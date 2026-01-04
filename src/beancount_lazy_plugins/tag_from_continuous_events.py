@@ -21,10 +21,12 @@ from __future__ import annotations
 import collections
 import dataclasses
 from bisect import bisect_right
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 from beancount.core import data
 from beancount.core.data import Custom, Event, Transaction
+from fava.core.fava_options import FavaOptions
+from fava.core.filters import AccountFilter, AdvancedFilter, TimeFilter
 
 __plugins__ = ["tag_from_continuous_events"]
 
@@ -38,6 +40,9 @@ TagFromContinuousEventsError = collections.namedtuple(
 class _Config:
     event_name: str
     tag_templates: tuple[str, ...]
+    time: Optional[str] = None
+    account: Optional[str] = None
+    filter: Optional[str] = None
 
 
 def _parse_tag_templates(tags_value: str) -> tuple[str, ...]:
@@ -60,6 +65,9 @@ def _iter_configs(entries: Iterable[data.Directive]) -> tuple[list[_Config], lis
 
         name = entry.meta.get("name") if entry.meta else None
         tags_value = entry.meta.get("tags") if entry.meta else None
+        time_value = entry.meta.get("time") if entry.meta else None
+        account_value = entry.meta.get("account") if entry.meta else None
+        filter_value = entry.meta.get("filter") if entry.meta else None
 
         if not isinstance(name, str) or not name.strip():
             errors.append(
@@ -80,6 +88,38 @@ def _iter_configs(entries: Iterable[data.Directive]) -> tuple[list[_Config], lis
             )
             continue
 
+        if time_value is not None and (not isinstance(time_value, str) or not time_value.strip()):
+            errors.append(
+                TagFromContinuousEventsError(
+                    source=entry.meta or {},
+                    message='Invalid "time" in config custom directive; expected a non-empty string',
+                    entry=entry,
+                )
+            )
+            continue
+        if account_value is not None and (
+            not isinstance(account_value, str) or not account_value.strip()
+        ):
+            errors.append(
+                TagFromContinuousEventsError(
+                    source=entry.meta or {},
+                    message='Invalid "account" in config custom directive; expected a non-empty string',
+                    entry=entry,
+                )
+            )
+            continue
+        if filter_value is not None and (
+            not isinstance(filter_value, str) or not filter_value.strip()
+        ):
+            errors.append(
+                TagFromContinuousEventsError(
+                    source=entry.meta or {},
+                    message='Invalid "filter" in config custom directive; expected a non-empty string',
+                    entry=entry,
+                )
+            )
+            continue
+
         templates = _parse_tag_templates(tags_value)
         if not templates:
             errors.append(
@@ -91,9 +131,24 @@ def _iter_configs(entries: Iterable[data.Directive]) -> tuple[list[_Config], lis
             )
             continue
 
-        configs.append(_Config(event_name=name.strip(), tag_templates=templates))
+        configs.append(
+            _Config(
+                event_name=name.strip(),
+                tag_templates=templates,
+                time=time_value.strip() if isinstance(time_value, str) else None,
+                account=account_value.strip() if isinstance(account_value, str) else None,
+                filter=filter_value.strip() if isinstance(filter_value, str) else None,
+            )
+        )
 
     return configs, errors
+
+
+def _matches_filter(entry: Transaction, filter_obj: Any) -> bool:
+    """Match using Fava filter semantics (kept consistent with filter_map plugin)."""
+    if isinstance(filter_obj, TimeFilter):
+        return entry.date >= filter_obj.date_range.begin and entry.date < filter_obj.date_range.end
+    return len(filter_obj.apply([entry])) > 0
 
 
 def _build_event_timeline(
@@ -131,6 +186,30 @@ def tag_from_continuous_events(entries, options_map, config_str=None):
     if not configs:
         return entries, errors
 
+    compiled_filters: dict[_Config, list[Any]] = {}
+    for cfg in configs:
+        filters: list[Any] = []
+        try:
+            if cfg.time:
+                filters.append(TimeFilter(options_map, FavaOptions(), cfg.time))
+            if cfg.account:
+                filters.append(AccountFilter(cfg.account))
+            if cfg.filter:
+                filters.append(AdvancedFilter(cfg.filter))
+        except Exception as exc:
+            errors.append(
+                TagFromContinuousEventsError(
+                    source={},
+                    message=(
+                        f"Failed to build filters for event {cfg.event_name!r}: {exc}. "
+                        'Check "time", "account", and "filter" in the config.'
+                    ),
+                    entry=None,
+                )
+            )
+            filters = []
+        compiled_filters[cfg] = filters
+
     timeline = _build_event_timeline(entries)
 
     new_entries: list[data.Directive] = []
@@ -143,6 +222,10 @@ def tag_from_continuous_events(entries, options_map, config_str=None):
         new_tags = set(current_tags)
 
         for cfg in configs:
+            filters = compiled_filters.get(cfg, [])
+            if filters and not all(_matches_filter(entry, f) for f in filters):
+                continue
+
             changes = timeline.get(cfg.event_name)
             if not changes:
                 continue
