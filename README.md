@@ -17,7 +17,7 @@ Set of plugins for lazy (or not so) people used by [lazy-beancount](https://gith
 * [expense_merchant_map](#expense_merchant_map): extend expense account names to include merchant names
 * [tag_from_continuous_events](#tag_from_continuous_events): apply tags to transactions based on Events
 
-## 🔌 valuation
+## valuation
 A Beancount plugin to track total value of the opaque fund. You can use it instead of the ```balance``` operation to assert total value of the account. If the value of the account is currently different, it will instead alter price of the underlying synthetical commodity created by the plugin used for technical purposes.
 
 You can use it instead of combination of ```pad```/```balance``` checks to avoid generating realized gains/losses in the account.
@@ -99,7 +99,7 @@ transactions in/out of the account.
 
     ; Account is at 0 again now
 
-## 🔌 filter_map
+## filter_map
 A plugin that allows to apply operations to group of transactions. You can filter by set of parameters (taken from [Fava's filters](https://lazy-beancount.xyz/docs/stage2_expenses/advanced_fava/#filters), plugin is using the same code) and apply tag or add metadata to the transaction. Considering that tags and metadata can later be used by other plugins, it allows a lot of flexibility in the potential usage.
 
 ### Syntax
@@ -183,7 +183,7 @@ Let's consider example 3 again. For each trip you want to describe it's likely t
 ```
 When some of the auto-imported merchant names do not make sense or are displayed differently in different transactions or banks, you may map them to something more understandable for you and useful for search / grouping in Fava and dashboards.
 
-## 🔌 auto_accounts
+## auto_accounts
 A Beancount plugin that automatically inserts Open directives for accounts not opened (at the date of the first entry). Slightly improved version of the plugin supplied with Beancount by default. Reports all auto-opened accounts and adds metadata to Open directives. This allows to have the convenience of auto-opening accounts but avoiding accidental mistakes in the ledger.
 
 Enable the plugin in your ledger:
@@ -203,7 +203,7 @@ plugin "beancount_lazy_plugins.auto_accounts" "{'ignore_regex': 'Assets:.*:Pendi
 - **Account filtering**: You can use the `ignore_regex` configuration to exclude certain accounts from reporting
 - **Metadata marking**: Auto-inserted Open directives are marked with `auto_accounts: True` metadata for easy identification.
 
-## 🔌 currency_convert
+## currency_convert
 A Beancount plugin that automatically converts posting amounts to different currencies based on `convert_to` metadata. This plugin processes all transactions and converts postings that have a `convert_to: "<target_currency>"` metadata field using the price data available in your ledger.
 This may be useful if you're adding/modifying transactions manually and when it's easier to specify it in one currency whereas it would make more sense to have it in another currency in the ledger.
 
@@ -233,7 +233,7 @@ Expenses:Food            120.00 USD @ 1.2 EUR
     converted_from: "100.00 EUR"
 ```
 
-## 🔌 expense_merchant_map
+## expense_merchant_map
 A Beancount plugin that automatically extends expense account names to include merchant names derived from transaction payees or narrations. This helps create more detailed (but rough) expense categorization by merchant while maintaining your existing high-level expense account structure. May be useful as a quick experiment.
 
 ### Usage
@@ -245,7 +245,7 @@ plugin "beancount_lazy_plugins.expense_merchant_map"
 
 It probably doesn't make sense to keep it on all the time, but could be fun as a quick experiment
 
-## 🔌 group_pad_transactions
+## group_pad_transactions
 This plugin improves treatment of pad/balance operations, in partucular if you use them following
 this guide: https://lazy-beancount.xyz/docs/stage1_totals/explanation/
 
@@ -267,7 +267,7 @@ plugin "beancount.ops.balance"
 plugin "beancount_lazy_plugins.group_pad_transactions"
 ```
 
-## 🔌 generate_inverse_prices
+## generate_inverse_prices
 A Beancount plugin that automatically generates inverse price directives for all existing prices in your ledger.
 
 ### Usage
@@ -290,7 +290,7 @@ The plugin will automatically generate the inverse prices:
 2024-01-15 price EUR 1.149425287 USD
 ```
 
-## 🔌 balance_extended
+## balance_extended
 A Beancount plugin that adds custom balance operations with a type parameter. It helps you:
 - **full**: Expand a balance assertion into separate per-currency assertions. For currencies declared in the account's `open` directive but not listed in the custom, a zero balance assertion is generated.
 - **padded**: Creates a `pad` directive on day-1 from a specified pad account, and asserts only the currencies explicitly listed in the directive (does not expand to all declared currencies).
@@ -322,7 +322,7 @@ Then use one of the supported custom directives:
 2015-01-01 custom "balance-ext" "full-padded" Assets:Bank:Savings Equity:Opening-Balances  100 EUR  230 USD
 ```
 
-## 🔌 tag_from_continuous_events
+## tag_from_continuous_events
 A Beancount plugin that automatically applies tags to continuous events. Description of the event directive form the official documentation: https://beancount.github.io/docs/beancount_language_syntax.html#events
 The plugin will go through the transactions in the ledger and apply tags accordingly to the value of the event at the date of the transaction. 
 
