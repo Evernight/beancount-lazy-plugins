@@ -8,7 +8,7 @@ from decimal import Decimal
 from datetime import date
 
 from beancount import loader
-from beancount.core.data import Amount, Balance, Commodity, Custom, Posting, Price, Transaction
+from beancount.core.data import Amount, Balance, Booking, Commodity, Open, Price, Transaction
 from beancount.parser import printer
 from beancount_lazy_plugins.valuation import valuation
 
@@ -130,4 +130,33 @@ def assert_cool_fund_example(new_entries):
 
 def assert_some_fund_example(new_entries):
     pass
+
+
+def test_creates_open_when_missing_in_ledger():
+    ledger = """
+option "operating_currency" "USD"
+
+1970-01-01 open Assets:Physical:Cash
+1970-01-01 open Income:CoolFund:PnL
+
+1970-01-01 custom "valuation" "config"
+    account: "Assets:CoolFund:Total"
+    currency: "COOL_FUND_USD"
+    pnlAccount: "Income:CoolFund:PnL"
+
+2024-01-10 * "Investing $1k in CoolFund"
+    Assets:Physical:Cash    -1000.00 USD
+    Assets:CoolFund:Total    1000.00 USD
+"""
+
+    entries, _, options_map = loader.load_string(ledger)
+
+    new_entries, errors = valuation(entries, options_map)
+    assert not errors
+
+    opens = [e for e in new_entries if isinstance(e, Open)]
+    open_entry = next((e for e in opens if e.account == "Assets:CoolFund:Total"), None)
+    assert open_entry is not None, "Expected an Open entry for Assets:CoolFund:Total to be created"
+    assert open_entry.currencies == ["COOL_FUND_USD"]
+    assert open_entry.booking == Booking.FIFO
     

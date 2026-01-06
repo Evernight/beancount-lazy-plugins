@@ -59,6 +59,10 @@ ValuationPluginError = collections.namedtuple(
     "ValuationPluginError", "source message entry"
 )
 
+AccountMapping = collections.namedtuple(
+    "AccountMapping", "currency pnl_account"
+)
+
 
 def valuation(entries, options_map, config_str=None):
     # Configuration defined via valuation-config statement is a dictionary
@@ -74,6 +78,7 @@ def valuation(entries, options_map, config_str=None):
     modified_transactions = []
 
     account_mapping = {}
+    account_config_entries = {}
     # read config
     for entry in entries:
         if (
@@ -81,25 +86,31 @@ def valuation(entries, options_map, config_str=None):
             and entry.type == "valuation"
             and entry.values[0].value == "config"
         ):
-            account_mapping[entry.meta["account"]] = (
+            account = entry.meta["account"]
+            account_mapping[account] = AccountMapping(
                 entry.meta["currency"],
                 entry.meta["pnlAccount"],
             )
+            account_config_entries[account] = entry
 
     booking_methods = {}
     open_account_entries = {}
+    generated_open_entries = []
     for entry in entries:
         if isinstance(entry, Open) and entry.account in account_mapping:
             open_account_entries[entry.account] = entry
     for account in account_mapping.keys():
         if account not in open_account_entries:
-            open_account_entries[account] = Open(
-                entry.meta,
-                entry.date,
-                entry.account,
-                account_mapping[account]['currency'],
+            config_entry = account_config_entries[account]
+            open_entry = Open(
+                {},
+                config_entry.date,
+                account,
+                [account_mapping[account].currency],
                 Booking.FIFO
             )
+            open_account_entries[account] = open_entry
+            generated_open_entries.append(open_entry)
         booking_methods[account] = Booking.FIFO
 
 
@@ -332,7 +343,7 @@ def valuation(entries, options_map, config_str=None):
     # sys.stdout.flush()
 
     return (
-        new_entries + commodities + prices + \
+        new_entries + generated_open_entries + commodities + prices + \
               [e for e in cost_processed_transactions if isinstance(e, Transaction)],
         plugin_errors + cost_processed_errors,
     )
