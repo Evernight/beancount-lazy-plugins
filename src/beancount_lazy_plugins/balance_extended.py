@@ -19,6 +19,7 @@ This plugin implements balance operations with a type parameter:
 The Account "Open" instruction should specify all of the currencies used.
 """
 
+import ast
 import collections
 import datetime
 from decimal import Decimal
@@ -28,6 +29,9 @@ from typing import NamedTuple
 from beancount.core import data
 from beancount.core import amount
 from beancount.core.number import D
+from beancount.parser.grammar import ValueType
+
+from beancount.core.account import TYPE as ACCOUNT_TYPE
 
 __plugins__ = ["balance_extended"]
 
@@ -45,12 +49,24 @@ BalanceExtendedError = collections.namedtuple(
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
-    source_account: str
+    source_account: str | None
+
+
+def pad_key_exists(existing_pad_keys, date, account, source_account):
+    """Check for existing pad entries, ignoring source_account when None."""
+    if source_account is None:
+        return any(
+            key.date == date and key.account == account
+            for key in existing_pad_keys
+        )
+    return PadKey(date, account, source_account) in existing_pad_keys
 
 
 def balance_extended(entries, options_map, config_str=None):
-    """Process balance custom operations with type parameter.
+    """Extended version of the balance operation.
     
+    It doesn't replace the original plugin but can be used in addition to it.
+
     Args:
       entries: A list of directives.
       options_map: A parser options dict.
@@ -62,12 +78,32 @@ def balance_extended(entries, options_map, config_str=None):
     errors = []
     new_entries = []
 
+    config = {}
+    if config_str:
+        try:
+            config = ast.literal_eval(config_str)
+        except (ValueError, SyntaxError) as e:
+            errors.append(BalanceExtendedError(
+                source=None,
+                message=f"Invalid configuration string: {e}",
+                entry=None
+            ))
+            return entries, errors
+
     # Track Pad directives (both pre-existing and created by this plugin run) so we don't
     # emit duplicates for the same (date, account, source_account).
     existing_pad_keys: set[PadKey] = set()
     for entry in entries:
         if isinstance(entry, data.Pad):
             existing_pad_keys.add(PadKey(entry.date, entry.account, entry.source_account))
+        elif isinstance(entry, data.Custom) and entry.type == "pad-ext":
+            pad_account = entry.meta.get("pad_account")
+            account_value = None
+            if entry.values:
+                account_value = entry.values[0].value
+            if isinstance(account_value, str):
+                source_account = pad_account if isinstance(pad_account, str) else None
+                existing_pad_keys.add(PadKey(entry.date, account_value, source_account))
     
     # Build mapping of account currencies from Open directives
     account_currencies = build_account_currencies_mapping(entries)
@@ -77,7 +113,7 @@ def balance_extended(entries, options_map, config_str=None):
             if entry.type == "balance-ext":
                 # Process balance custom operation
                 balance_entries, entry_errors = process_balance(
-                    entry, account_currencies, existing_pad_keys
+                    entry, account_currencies, existing_pad_keys, config
                 )
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
@@ -112,13 +148,14 @@ def build_account_currencies_mapping(entries):
     return account_currencies
 
 
-def process_balance(custom_entry, account_currencies, existing_pad_keys):
+def process_balance(custom_entry, account_currencies, existing_pad_keys, config):
     """Common logic for processing balance custom operations.
     
     Args:
       custom_entry: A Custom directive with type "balance-ext"
       account_currencies: Dictionary mapping account names to sets of currencies
       existing_pad_keys: A mutable set of already-seen pad keys to avoid duplicates
+      config: A dictionary of configuration options
     Returns:
       A tuple of (list of new entries, list of errors)
     """
@@ -153,21 +190,9 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys):
         ))
         return new_entries, errors
     
-    # Determine expected format and minimum arguments based on type
-    if balance_type == BalanceType.FULL:
-        min_args = 3  # balance_type + account + amount (minimum)
-        expected_format = "balance_type account amount1 [amount2 ...]"
-        values_start_index = 2
-    elif balance_type == BalanceType.PADDED:
-        min_args = 4  # balance_type + account + pad_account + amount (minimum)
-        expected_format = "balance_type account pad_account amount1 [amount2 ...]"
-        values_start_index = 3
-    elif balance_type == BalanceType.FULL_PADDED:
-        min_args = 4  # balance_type + account + pad_account + amount (minimum)
-        expected_format = "balance_type account pad_account amount1 [amount2 ...]"
-        values_start_index = 3
-    else:
-        raise ValueError(f"Invalid balance_type: {balance_type}")
+    min_args = 3  # balance_type + account + amount (minimum)
+    expected_format = "balance_type account amount1 [amount2 ...]"
+    values_start_index = 2
     
     # Parse the custom directive values
     if len(custom_entry.values) < min_args:
@@ -189,25 +214,37 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys):
     
     # Handle pad account for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
-        pad_account = custom_entry.values[2].value
-        if not isinstance(pad_account, str):
+        pad_account = custom_entry.meta.get("pad_account")
+        if pad_account is not None and not isinstance(pad_account, str):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
-                f"Third argument to balance-ext {balance_type.value} must be a pad account name (string)",
+                f"pad_account metadata for balance-ext {balance_type.value} must be a string",
                 custom_entry
             ))
             return new_entries, errors
-        
-        # Create pad directive on day-1
+
         pad_date = custom_entry.date - datetime.timedelta(days=1)
-        pad_key = PadKey(pad_date, account, pad_account)
-        if pad_key not in existing_pad_keys:
-            pad_entry = data.Pad(
-                meta=data.new_metadata("<balance_extended>", 0),
-                date=pad_date,
-                account=account,
-                source_account=pad_account
-            )
+        source_account = pad_account if isinstance(pad_account, str) else None
+        pad_key = PadKey(pad_date, account, source_account)
+        if not pad_key_exists(existing_pad_keys, pad_date, account, source_account):            
+            if config.get('default_pad_type', 'pad') == 'pad-ext':
+                pad_entry = data.Custom(
+                    meta=custom_entry.meta,
+                    date=pad_date,
+                    type="pad-ext",
+                    values=[ValueType(account, dtype=ACCOUNT_TYPE)],
+                )
+            else:
+                pad_entry = data.Pad(
+                    meta=custom_entry.meta,
+                    date=pad_date,
+                    account=account,
+                    source_account=source_account,
+                )
+            pad_entry.meta['generated_by'] = "balance-ext"
+            if isinstance(pad_account, str):
+                pad_entry.meta["pad_account"] = pad_account
+            
             new_entries.append(pad_entry)
             existing_pad_keys.add(pad_key)
     

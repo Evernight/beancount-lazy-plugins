@@ -84,6 +84,7 @@ class TestBalanceExtended(unittest.TestCase):
     def test_balance_padded_single_currency(self):
         """Test balance padded with a single currency."""
         meta = data.new_metadata("test.beancount", 1)
+        meta["pad_account"] = "Equity:Opening-Balances"
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -91,7 +92,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
             )
         )
@@ -104,9 +104,10 @@ class TestBalanceExtended(unittest.TestCase):
         
         # Check pad entry
         pad_entry = new_entries[0]
-        self.assertIsInstance(pad_entry, data.Pad)
-        self.assertEqual(pad_entry.account, "Assets:Checking")
-        self.assertEqual(pad_entry.source_account, "Equity:Opening-Balances")
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
         self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
         
         # Check balance entry
@@ -119,6 +120,7 @@ class TestBalanceExtended(unittest.TestCase):
     def test_balance_padded_does_not_create_duplicate_pad_for_same_key(self):
         """If multiple balance-ext padded directives would create the same Pad, emit it once."""
         meta = data.new_metadata("test.beancount", 1)
+        meta["pad_account"] = "Equity:Opening-Balances"
         custom_entry_1 = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -126,18 +128,18 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
             )
         )
+        meta_2 = data.new_metadata("test.beancount", 1)
+        meta_2["pad_account"] = "Equity:Opening-Balances"
         custom_entry_2 = data.Custom(
-            meta=meta,
+            meta=meta_2,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("150"), "USD"),
             )
         )
@@ -146,13 +148,17 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, self.options_map)
 
         self.assertEqual(len(errors), 0)
-        pads = [e for e in new_entries if isinstance(e, data.Pad)]
+        pad_ext_entries = [
+            e for e in new_entries
+            if isinstance(e, data.Custom) and e.type == "pad-ext"
+        ]
         balances = [e for e in new_entries if isinstance(e, data.Balance)]
 
-        self.assertEqual(len(pads), 1)
-        self.assertEqual(pads[0].account, "Assets:Checking")
-        self.assertEqual(pads[0].source_account, "Equity:Opening-Balances")
-        self.assertEqual(pads[0].date, datetime.date(2014, 12, 31))  # day-1
+        self.assertEqual(len(pad_ext_entries), 1)
+        pad_entry = pad_ext_entries[0]
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
+        self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
 
         # Both directives should still produce their balance assertion.
         self.assertEqual(len(balances), 2)
@@ -169,6 +175,7 @@ class TestBalanceExtended(unittest.TestCase):
             account="Assets:Checking",
             source_account="Equity:Opening-Balances",
         )
+        meta["pad_account"] = "Equity:Opening-Balances"
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -176,7 +183,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
             )
         )
@@ -192,6 +198,7 @@ class TestBalanceExtended(unittest.TestCase):
     def test_balance_padded_multiple_currencies(self):
         """Test balance padded with multiple currencies."""
         meta = data.new_metadata("test.beancount", 1)
+        meta["pad_account"] = "Equity:Opening-Balances"
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -199,7 +206,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "EUR"),
                 amount.Amount(D("230"), "USD"),
             )
@@ -213,9 +219,10 @@ class TestBalanceExtended(unittest.TestCase):
         
         # Check pad entry
         pad_entry = new_entries[0]
-        self.assertIsInstance(pad_entry, data.Pad)
-        self.assertEqual(pad_entry.account, "Assets:Checking")
-        self.assertEqual(pad_entry.source_account, "Equity:Opening-Balances")
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
         self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
         
         # Check first balance entry (EUR)
@@ -291,11 +298,12 @@ class TestBalanceExtended(unittest.TestCase):
     def test_balance_padded_insufficient_arguments(self):
         """Test balance padded with insufficient arguments."""
         meta = data.new_metadata("test.beancount", 1)
+        meta["pad_account"] = "Equity:Opening-Balances"
         custom_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
             type="balance-ext",
-            values=wrap_values("padded", "Assets:Checking", "Equity:Opening-Balances")  # Missing amount and currency
+            values=wrap_values("padded", "Assets:Checking")  # Missing amount and currency
         )
         
         entries = [custom_entry]
@@ -304,7 +312,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("balance_type account pad_account amount1", errors[0].message)
+        self.assertIn("balance_type account amount1", errors[0].message)
 
     def test_invalid_account_type(self):
         """Test with non-string account."""
@@ -456,6 +464,7 @@ class TestBalanceExtended(unittest.TestCase):
             )
         )
         
+        meta["pad_account"] = "Equity:Opening-Balances"
         balance_padded_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 2, 1),
@@ -463,7 +472,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("150"), "EUR"),
             )
         )
@@ -482,7 +490,8 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertIsInstance(new_entries[2], data.Balance)
         
         # Check balance padded entries (pad + balance)
-        self.assertIsInstance(new_entries[3], data.Pad)
+        self.assertIsInstance(new_entries[3], data.Custom)
+        self.assertEqual(new_entries[3].type, "pad-ext")
         self.assertIsInstance(new_entries[4], data.Balance)
 
     def test_balance_full_with_zero_currencies(self):
@@ -538,6 +547,7 @@ class TestBalanceExtended(unittest.TestCase):
         )
         
         # Balance directive only specifies EUR, should create USD and CAD as 0
+        meta["pad_account"] = "Equity:Opening-Balances"
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -545,7 +555,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("50"), "EUR"),
             )
         )
@@ -560,9 +569,11 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(new_entries[0], open_entry)
         
         # Check pad entry
-        self.assertIsInstance(new_entries[1], data.Pad)
-        self.assertEqual(new_entries[1].account, "Assets:Checking")
-        self.assertEqual(new_entries[1].source_account, "Equity:Opening-Balances")
+        pad_entry = new_entries[1]
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
         
         # Check balance assertions - should be sorted by currency
         balance_assertions = [e for e in new_entries[2:] if isinstance(e, data.Balance)]
@@ -698,6 +709,7 @@ class TestBalanceExtended(unittest.TestCase):
         )
         
         # Balance directive only specifies USD, should create EUR and GBP as 0 AND create pad
+        meta["pad_account"] = "Equity:Opening-Balances"
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -705,7 +717,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "full-padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
             )
         )
@@ -720,10 +731,12 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(new_entries[0], open_entry)
         
         # Check pad entry
-        self.assertIsInstance(new_entries[1], data.Pad)
-        self.assertEqual(new_entries[1].account, "Assets:Checking")
-        self.assertEqual(new_entries[1].source_account, "Equity:Opening-Balances")
-        self.assertEqual(new_entries[1].date, datetime.date(2014, 12, 31))  # day-1
+        pad_entry = new_entries[1]
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
+        self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
         
         # Check balance assertions - should be sorted by currency
         balance_assertions = [e for e in new_entries[2:] if isinstance(e, data.Balance)]
@@ -748,6 +761,7 @@ class TestBalanceExtended(unittest.TestCase):
         )
         
         # Balance directive specifies USD and EUR, should create GBP and CAD as 0 AND create pad
+        meta["pad_account"] = "Equity:Opening-Balances"
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -755,7 +769,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "full-padded",
                 "Assets:Checking",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
                 amount.Amount(D("50"), "EUR"),
             )
@@ -771,10 +784,12 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(new_entries[0], open_entry)
         
         # Check pad entry
-        self.assertIsInstance(new_entries[1], data.Pad)
-        self.assertEqual(new_entries[1].account, "Assets:Checking")
-        self.assertEqual(new_entries[1].source_account, "Equity:Opening-Balances")
-        self.assertEqual(new_entries[1].date, datetime.date(2014, 12, 31))  # day-1
+        pad_entry = new_entries[1]
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
+        self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
         
         # Check balance assertions - should be sorted by currency
         balance_assertions = [e for e in new_entries[2:] if isinstance(e, data.Balance)]
@@ -791,6 +806,7 @@ class TestBalanceExtended(unittest.TestCase):
         meta = data.new_metadata("test.beancount", 1)
         
         # No open directive for the account
+        meta["pad_account"] = "Equity:Opening-Balances"
         balance_entry = data.Custom(
             meta=meta,
             date=datetime.date(2015, 1, 1),
@@ -798,7 +814,6 @@ class TestBalanceExtended(unittest.TestCase):
             values=wrap_values(
                 "full-padded",
                 "Assets:Unknown",
-                "Equity:Opening-Balances",
                 amount.Amount(D("100"), "USD"),
                 amount.Amount(D("50"), "EUR"),
             )
@@ -811,9 +826,11 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 3)  # 1 pad + 2 balance assertions only
         
         # Check pad entry
-        self.assertIsInstance(new_entries[0], data.Pad)
-        self.assertEqual(new_entries[0].account, "Assets:Unknown")
-        self.assertEqual(new_entries[0].source_account, "Equity:Opening-Balances")
+        pad_entry = new_entries[0]
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Unknown")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
         
         # Check balance assertions - should only create what's specified
         balance_assertions = [e for e in new_entries[1:] if isinstance(e, data.Balance)]
