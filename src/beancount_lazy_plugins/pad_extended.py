@@ -21,6 +21,10 @@ from beancount.utils import misc_utils
 __plugins__ = ["pad_extended"]
 
 
+DEFAULT_DEFAULT_PAD_ACCOUNT_CONFIG = [
+    (r"^.*$", "Expenses:Unattributed:{name}", "Income:Unattributed:{name}"),
+]
+
 class PadError(NamedTuple):
     """Represents an error encountered during padding."""
 
@@ -35,6 +39,11 @@ def is_pad_entry(entry, config):
     return isinstance(entry, data.Custom) and entry.type == "pad-ext"
 
 def get_source_account(pad_entry, diff_position, default_pad_account_config, default_pad_acount_cache):
+    """
+    Get the source account for a pad entry in the following order of precedence:
+    1. The source account specified in the pad entry metadata
+    2. The source account specified in the default pad account configuration
+    """
     if pad_entry.meta.get('pad_account'):
         return pad_entry.meta.get('pad_account')
 
@@ -67,15 +76,8 @@ def get_source_account(pad_entry, diff_position, default_pad_account_config, def
 def pad_extended(entries, options_map, config_str=None):
     """Insert transaction entries for to fulfill a subsequent balance check.
 
-    Synthesize and insert Transaction entries right after Pad entries in order
-    to fulfill checks in the padded accounts. Returns a new list of entries.
-    Note that this doesn't pad across parent-child relationships, it is a very
-    simple kind of pad. (I have found this to be sufficient in practice, and
-    simpler to implement and understand.)
-
-    Furthermore, this pads for a single currency only, that is, balance checks
-    are specified only for one currency at a time, and pads will only be
-    inserted for those currencies.
+    This is an extended version of the pad plugin supplied with Beancount (beancount.ops.pad).
+    See original plugin code and documentation for more details. Only differences will be documented here.
 
     Args:
       entries: A list of directives.
@@ -101,7 +103,7 @@ def pad_extended(entries, options_map, config_str=None):
 
     default_pad_account_config = []
     # Reverse for convenient checking later
-    for item in reversed(config['default_pad_account']):
+    for item in reversed(config.get('default_pad_account', DEFAULT_DEFAULT_PAD_ACCOUNT_CONFIG)):
         if len(item) > 4:
             raise ValueError(f"Invalid default pad account configuration: {item}. Should be (regex, source_account) or (regex, source_account_positive, source_account_negative) or (regex, source_account_positive, source_account_negative, initial_source_account)")    
         default_pad_account_config.append((re.compile(item[0]),) + item[1:])

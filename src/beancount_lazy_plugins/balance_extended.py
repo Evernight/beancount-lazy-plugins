@@ -21,6 +21,7 @@ The Account "Open" instruction should specify all of the currencies used.
 
 import ast
 import collections
+import copy
 import datetime
 from decimal import Decimal
 from enum import Enum
@@ -49,17 +50,6 @@ BalanceExtendedError = collections.namedtuple(
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
-    source_account: str | None
-
-
-def pad_key_exists(existing_pad_keys, date, account, source_account):
-    """Check for existing pad entries, ignoring source_account when None."""
-    if source_account is None:
-        return any(
-            key.date == date and key.account == account
-            for key in existing_pad_keys
-        )
-    return PadKey(date, account, source_account) in existing_pad_keys
 
 
 def balance_extended(entries, options_map, config_str=None):
@@ -95,15 +85,13 @@ def balance_extended(entries, options_map, config_str=None):
     existing_pad_keys: set[PadKey] = set()
     for entry in entries:
         if isinstance(entry, data.Pad):
-            existing_pad_keys.add(PadKey(entry.date, entry.account, entry.source_account))
+            existing_pad_keys.add(PadKey(entry.date, entry.account))
         elif isinstance(entry, data.Custom) and entry.type == "pad-ext":
-            pad_account = entry.meta.get("pad_account")
             account_value = None
             if entry.values:
                 account_value = entry.values[0].value
-            if isinstance(account_value, str):
-                source_account = pad_account if isinstance(pad_account, str) else None
-                existing_pad_keys.add(PadKey(entry.date, account_value, source_account))
+            if isinstance(account_value, str):                
+                existing_pad_keys.add(PadKey(entry.date, account_value))
     
     # Build mapping of account currencies from Open directives
     account_currencies = build_account_currencies_mapping(entries)
@@ -223,20 +211,22 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
             ))
             return new_entries, errors
 
-        pad_date = custom_entry.date - datetime.timedelta(days=1)
-        source_account = pad_account if isinstance(pad_account, str) else None
-        pad_key = PadKey(pad_date, account, source_account)
-        if not pad_key_exists(existing_pad_keys, pad_date, account, source_account):            
-            if config.get('default_pad_type', 'pad') == 'pad-ext':
+        pad_date = custom_entry.date - datetime.timedelta(days=1)        
+        pad_key = PadKey(pad_date, account)
+        if pad_key not in existing_pad_keys:            
+            pad_type = config.get('default_pad_type', 'pad-ext')
+            if pad_type == 'pad-ext':
                 pad_entry = data.Custom(
-                    meta=custom_entry.meta,
+                    meta=custom_entry.meta.copy(),
                     date=pad_date,
                     type="pad-ext",
                     values=[ValueType(account, dtype=ACCOUNT_TYPE)],
                 )
             else:
+                source_account = pad_account if isinstance(pad_account, str) else None
+                assert source_account is not None, "when configured to use 'pad', pad_account must be specified"
                 pad_entry = data.Pad(
-                    meta=custom_entry.meta,
+                    meta=custom_entry.meta.copy(),
                     date=pad_date,
                     account=account,
                     source_account=source_account,
