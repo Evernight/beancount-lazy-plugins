@@ -38,15 +38,25 @@ __plugins__ = ["balance_extended"]
 
 class BalanceType(Enum):
     """Enum for balance operation types."""
-    REGULAR = "default"
+    REGULAR = "regular"
     FULL = "full"
     PADDED = "padded"
     FULL_PADDED = "full-padded"
 
+BALANCE_TYPE_MAPPINGS = {    
+    "": BalanceType.REGULAR.value,
+    "F": BalanceType.FULL.value,
+    "~": BalanceType.PADDED.value,
+    "F~": BalanceType.FULL_PADDED.value,
+    "~F": BalanceType.FULL_PADDED.value,
+    "!": BalanceType.REGULAR.value,
+    "!F": BalanceType.FULL.value,
+    "F!": BalanceType.FULL.value,
+}
+
 BalanceExtendedError = collections.namedtuple(
     "BalanceExtendedError", "source message entry"
 )
-
 
 class PadKey(NamedTuple):
     date: datetime.date
@@ -158,6 +168,8 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
     )
     if type_given:
         balance_type_str = custom_entry.values[0].value
+        if balance_type_str in BALANCE_TYPE_MAPPINGS:
+            balance_type_str = BALANCE_TYPE_MAPPINGS[balance_type_str]
     else:
         balance_type_str = config.get("default_balance_type", BalanceType.REGULAR.value)
 

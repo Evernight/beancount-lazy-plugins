@@ -304,26 +304,38 @@ Enable the plugin in your ledger:
 plugin "beancount_lazy_plugins.balance_extended"
 ```
 
-Declare the currencies you intend to use for the account in its `open` directive:
+The balance check with ```balance-ext``` looks like this:
+```
+2015-01-01 custom "balance-ext" [balance_type] Assets:Bank:Savings  100 EUR  230 USD
+```
+
+The ```balance_type``` is optional (default value is configured in the plugin) and is one of the following:
 
 ```
-2010-01-01 open Assets:Bank:Savings  EUR, USD
-```
+; 1) regular — resolves to regular balance check
+2015-01-01 custom "balance-ext" "regular" Assets:Bank:Savings  100 EUR  230 USD
 
-Then use one of the supported custom directives:
-
-```
-; 1) full — per-currency balance assertions; missing declared currencies default to 0
+; 2) full — per-currency balance assertions; missing declared currencies default to 0
 2015-01-01 custom "balance-ext" "full" Assets:Bank:Savings  100 EUR  230 USD
 
-; 2) padded — generates `pad` on previous day from a pad account; asserts only explicitly listed currencies
+; 3) padded — generates `pad` on previous day from a pad account; asserts only explicitly listed currencies
 2015-01-01 custom "balance-ext" "padded" Assets:Bank:Savings Equity:Opening-Balances  100 EUR  230 USD
 
-; 3) full-padded — combines full and padded
+; 4) full-padded — combines full and padded
 2015-01-01 custom "balance-ext" "full-padded" Assets:Bank:Savings Equity:Opening-Balances  100 EUR  230 USD
 ```
 
 By default "padded" operations generate ```pad-ext``` entries (see below). If you want to use standard ```pad``` operation, you can configure the plugin to do so by setting `default_pad_type` option to `pad`.
+
+The balance type can be specified in a shorter form:
+```
+2015-01-01 custom "balance-ext" "F" Assets:Bank:Savings  100 EUR  230 USD
+2015-01-01 custom "balance-ext" "~" Assets:Bank:Savings  100 EUR  230 USD
+2015-01-01 custom "balance-ext" "F~" Assets:Bank:Savings  100 EUR  230 USD
+2015-01-01 custom "balance-ext" "~F" Assets:Bank:Savings  100 EUR  230 USD
+```
+
+```F``` stands for full, ```~``` stands for padded (```!``` or empty string resolves to regular balance check)
 
 ## pad_extended
 A Beancount plugin that extends standard pad operation.
