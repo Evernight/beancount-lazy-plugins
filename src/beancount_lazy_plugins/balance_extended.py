@@ -262,7 +262,10 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
     for value_wrapper in values:
         amount_obj = value_wrapper.value
         
-        # Verify it's an Amount object
+        # Allow to put just 0 to specify empty balance
+        if isinstance(amount_obj, Decimal) and amount_obj == 0:
+            continue
+        # Otherwise vrify it's an Amount object
         if not isinstance(amount_obj, amount.Amount):
             errors.append(BalanceExtendedError(
                 custom_entry.meta,
