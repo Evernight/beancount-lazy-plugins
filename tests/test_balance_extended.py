@@ -19,7 +19,6 @@ class TestBalanceExtended(unittest.TestCase):
 
     def load_from_string(self, text):
         entries, errors, options_map = load_string(dedent(text))
-        print('errors', errors)
         self.assertEqual(len(errors), 0)
         return entries, options_map
 

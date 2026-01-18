@@ -9,6 +9,7 @@ Set of plugins for lazy (or not so) people used by [lazy-beancount](https://gith
 * [filter_map](#filter_map): apply operations to group of transactions selected by Fava filters
 * [group_pad_transactions](#group_pad_transactions): improves treatment of pad/balance operations for multi-currency accounts
 * [balance_extended](#balance_extended): adds extended balance assertions (full, padded, full-padded)
+* [pad_extended](#pad_extended): adds pad operation (pad-ext) extending the original pad operation (pad)
 * [auto_accounts](#auto_accounts): insert Open directives for accounts not opened
 * [generate_base_ccy_prices](#generate_base_ccy_prices): generate base currency prices for all currencies in the ledger (based on the original from [tariochbctools](https://github.com/tarioch/beancounttools/blob/master/src/tariochbctools/plugins/generate_base_ccy_prices.py
 ))
@@ -320,6 +321,33 @@ Then use one of the supported custom directives:
 
 ; 3) full-padded — combines full and padded
 2015-01-01 custom "balance-ext" "full-padded" Assets:Bank:Savings Equity:Opening-Balances  100 EUR  230 USD
+```
+
+By default "padded" operations generate ```pad-ext``` entries (see below). If you want to use standard ```pad``` operation, you can configure the plugin to do so by setting `default_pad_type` option to `pad`.
+
+## pad_extended
+A Beancount plugin that extends standard pad operation.
+1. Pad operation does not generate errors on unused pad entries by default (configurable with `generate_errors_on_unused_pad_entries` option)
+2. You can configure default pad account for a set of accounts specified by regular expression.
+3. You can override the pad account by adding `pad_account` metadata to the pad entry.
+
+### Usage
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.pad_extended" "{
+    'default_pad_account': [
+        (re.compile(r'Assets:Bank:.*'), 'Equity:Opening-Balances'),
+    ],
+    'generate_errors_on_unused_pad_entries': False,
+}
+```
+
+Then use it like:
+
+```
+2015-01-01 custom "pad-ext" "pad" Assets:Bank:Savings
+2015-01-05 balance Assets:Bank:Savings 100 EUR
 ```
 
 ## tag_from_continuous_events
