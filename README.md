@@ -11,6 +11,7 @@ Set of plugins for lazy (or not so) people used by [lazy-beancount](https://gith
 * [balance_extended](#balance_extended): adds extended balance assertions (full, padded, full-padded)
 * [pad_extended](#pad_extended): adds pad operation (pad-ext) extending the original pad operation (pad)
 * [auto_accounts](#auto_accounts): insert Open directives for accounts not opened
+* [currencies_used](#currencies_used): track currencies used per account and add metadata to Open directives
 * [generate_base_ccy_prices](#generate_base_ccy_prices): generate base currency prices for all currencies in the ledger (based on the original from [tariochbctools](https://github.com/tarioch/beancounttools/blob/master/src/tariochbctools/plugins/generate_base_ccy_prices.py
 ))
 * [generate_inverse_prices](#generate_inverse_prices): generate inverse price directives for all existing prices
@@ -203,6 +204,25 @@ plugin "beancount_lazy_plugins.auto_accounts" "{'ignore_regex': 'Assets:.*:Pendi
 - **Warning generation**: The plugin generates warnings listing all auto-inserted accounts, which helps you review what was automatically added.
 - **Account filtering**: You can use the `ignore_regex` configuration to exclude certain accounts from reporting
 - **Metadata marking**: Auto-inserted Open directives are marked with `auto_accounts: True` metadata for easy identification.
+
+## currencies_used
+A Beancount plugin that tracks currencies used per account and adds metadata to Open directives. This helps you identify which currencies are used in which accounts. 
+With `extend_open_directives` option set to True, it will also extend Open directives with the currencies used. This is useful, for example, in combination with balance_extended plugin (full balance check) to avoid specifying currencies manually.
+
+### Usage
+Enable the plugin in your ledger:
+
+```
+plugin "beancount_lazy_plugins.currencies_used"
+```
+
+Or with optional configuration:
+```
+plugin "beancount_lazy_plugins.currencies_used" "{
+    'extend_open_directives': True,
+    'extend_from_pad_directives': True,
+}"
+```
 
 ## currency_convert
 A Beancount plugin that automatically converts posting amounts to different currencies based on `convert_to` metadata. This plugin processes all transactions and converts postings that have a `convert_to: "<target_currency>"` metadata field using the price data available in your ledger.
