@@ -47,6 +47,11 @@ def is_pad_entry(entry, config):
         return config.get('handle_default_pad_directives', False)
     return isinstance(entry, data.Custom) and entry.type == "pad-ext"
 
+def get_padded_account(pad_entry):
+    if type(pad_entry) == data.Pad:
+        return pad_entry.account
+    return pad_entry.values[0].value
+
 def get_source_account(pad_entry, diff_position, default_pad_account_config, default_pad_acount_cache):
     """
     Get the source account for a pad entry in the following order of precedence:
@@ -54,6 +59,11 @@ def get_source_account(pad_entry, diff_position, default_pad_account_config, def
     2. The account specified in pad-ext-config statements of matching regex
     2. The account specified in the default pad account configuration of matching regex
     """
+    if type(pad_entry) == data.Pad:
+        # Supports only direct specification of source account in Pad directive
+        return pad_entry.source_account
+
+    # Otherwise going down the specificity chain
     if pad_entry.meta.get('pad_account'):
         return pad_entry.meta.get('pad_account')
 
@@ -65,7 +75,7 @@ def get_source_account(pad_entry, diff_position, default_pad_account_config, def
         return default_pad_acount_cache[key]
 
     parts = pad_entry_account.split(':')
-    type = parts[0]
+    account_type = parts[0]
     name = ':'.join(parts[1:])
 
     # default_pad_account_config is sorted in decreasing specificity order
@@ -73,11 +83,11 @@ def get_source_account(pad_entry, diff_position, default_pad_account_config, def
         if mapping.regex.match(pad_entry_account):
             if mapping.pad_account_expenses and mapping.pad_account_income:
                 if position_sign > 0:
-                    res = mapping.pad_account_income.format(type=type, name=name)
+                    res = mapping.pad_account_income.format(type=account_type, name=name)
                 else:
-                    res = mapping.pad_account_expenses.format(type=type, name=name)
+                    res = mapping.pad_account_expenses.format(type=account_type, name=name)
             elif mapping.pad_account:
-                res = mapping.pad_account.format(type=type, name=name)
+                res = mapping.pad_account.format(type=account_type, name=name)
             else:
                 raise ValueError(f"Invalid default pad account configuration: {mapping}")
 
@@ -192,7 +202,7 @@ def pad_extended(entries, options_map, config_str=None):
 
     # Find all the pad entries and group them by account.
     pads = [e for e in entries if is_pad_entry(e, config)]
-    pad_dict = misc_utils.groupby(lambda x: x.values[0].value, pads)
+    pad_dict = misc_utils.groupby(lambda x: get_padded_account(x), pads)
 
     # Partially realize the postings, so we can iterate them by account.
     by_account = realization.postings_by_account(entries)
@@ -225,7 +235,7 @@ def pad_extended(entries, options_map, config_str=None):
                 pad_balance.add_position(entry.posting)
 
             elif is_pad_entry(entry, config):
-                pad_entry_account = entry.values[0].value
+                pad_entry_account = get_padded_account(entry)
                 if pad_entry_account == account_:
                     # Mark this newly encountered pad as active and allow all lots
                     # to be padded heretofore.
@@ -296,7 +306,7 @@ def pad_extended(entries, options_map, config_str=None):
                             [],
                         )
 
-                        pad_entry_account = active_pad.values[0].value
+                        pad_entry_account = get_padded_account(active_pad)
                         new_entry.postings.append(
                             data.Posting(
                                 pad_entry_account,
@@ -307,17 +317,12 @@ def pad_extended(entries, options_map, config_str=None):
                                 entry.meta,
                             )
                         )
-                        source_account = None
-                        if type(active_pad) == data.Pad:
-                            # Supports only direct specification of source account in Pad directive
-                            source_account = active_pad.source_account
-                        else:
-                            source_account = get_source_account(
-                                active_pad,
-                                diff_position,
-                                default_pad_account_config, 
-                                default_pad_acount_cache
-                            )
+                        source_account = get_source_account(
+                            active_pad,
+                            diff_position,
+                            default_pad_account_config, 
+                            default_pad_acount_cache
+                        )
 
                         neg_diff_position = -diff_position
                         new_entry.postings.append(

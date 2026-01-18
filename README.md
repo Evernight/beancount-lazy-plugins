@@ -346,7 +346,7 @@ plugin "beancount_lazy_plugins.pad_extended" "{
 Then use it like:
 
 ```
-2015-01-01 custom "pad-ext" "pad" Assets:Bank:Savings
+2015-01-01 custom "pad-ext" Assets:Bank:Savings
 2015-01-05 balance Assets:Bank:Savings 100 EUR
 ```
 

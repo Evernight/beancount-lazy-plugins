@@ -38,6 +38,7 @@ __plugins__ = ["balance_extended"]
 
 class BalanceType(Enum):
     """Enum for balance operation types."""
+    REGULAR = "default"
     FULL = "full"
     PADDED = "padded"
     FULL_PADDED = "full-padded"
@@ -150,24 +151,24 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
     errors = []
     new_entries = []
 
-    # Parse balance type from first parameter
-    if len(custom_entry.values) < 1:
-        errors.append(BalanceExtendedError(
-            custom_entry.meta,
-            "balance-ext directive requires at least balance_type parameter",
-            custom_entry
-        ))
-        return new_entries, errors
-    
-    balance_type_str = custom_entry.values[0].value
+    # Parse balance type from first parameter (optional – falls back to config default)
+    type_given = (
+        len(custom_entry.values) > 0
+        and isinstance(custom_entry.values[0].value, str)
+    )
+    if type_given:
+        balance_type_str = custom_entry.values[0].value
+    else:
+        balance_type_str = config.get("default_balance_type", BalanceType.REGULAR.value)
+
     if not isinstance(balance_type_str, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
-            "First argument to balance-ext must be balance type (string)",
+            "balance_ext default_balance_type must be a string",
             custom_entry
         ))
         return new_entries, errors
-    
+
     try:
         balance_type = BalanceType(balance_type_str)
     except ValueError:
@@ -177,10 +178,11 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
             custom_entry
         ))
         return new_entries, errors
-    
-    min_args = 3  # balance_type + account + amount (minimum)
+
+    min_args = 3 if type_given else 2  # account + amount + optional type
     expected_format = "balance_type account amount1 [amount2 ...]"
-    values_start_index = 2
+    account_index = 1 if type_given else 0
+    values_start_index = account_index + 1
     
     # Parse the custom directive values
     if len(custom_entry.values) < min_args:
@@ -191,7 +193,7 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
         ))
         return new_entries, errors
     
-    account = custom_entry.values[1].value
+    account = custom_entry.values[account_index].value
     if not isinstance(account, str):
         errors.append(BalanceExtendedError(
             custom_entry.meta,
@@ -216,6 +218,7 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
                     values=[ValueType(account, dtype=ACCOUNT_TYPE)],
                 )
             else:
+                # when Pad is used, pad_account must be set in the metadata
                 if not isinstance(pad_account, str):
                     errors.append(BalanceExtendedError(
                         custom_entry.meta,
