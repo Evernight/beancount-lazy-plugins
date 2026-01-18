@@ -203,13 +203,6 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
     # Handle pad account for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
         pad_account = custom_entry.meta.get("pad_account")
-        if pad_account is not None and not isinstance(pad_account, str):
-            errors.append(BalanceExtendedError(
-                custom_entry.meta,
-                f"pad_account metadata for balance-ext {balance_type.value} must be a string",
-                custom_entry
-            ))
-            return new_entries, errors
 
         pad_date = custom_entry.date - datetime.timedelta(days=1)        
         pad_key = PadKey(pad_date, account)
@@ -223,19 +216,25 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
                     values=[ValueType(account, dtype=ACCOUNT_TYPE)],
                 )
             else:
-                source_account = pad_account if isinstance(pad_account, str) else None
-                assert source_account is not None, "when configured to use 'pad', pad_account must be specified"
-                pad_entry = data.Pad(
-                    meta=custom_entry.meta.copy(),
-                    date=pad_date,
-                    account=account,
-                    source_account=source_account,
-                )
-            pad_entry.meta['generated_by'] = "balance-ext"
-            if isinstance(pad_account, str):
-                pad_entry.meta["pad_account"] = pad_account
-            
-            new_entries.append(pad_entry)
+                if not isinstance(pad_account, str):
+                    errors.append(BalanceExtendedError(
+                        custom_entry.meta,
+                        "pad_account metadata must be set when 'default_pad_type' is 'pad'",
+                        custom_entry,
+                    ))
+                    pad_entry = None
+                else:
+                    pad_entry = data.Pad(
+                        meta=custom_entry.meta.copy(),
+                        date=pad_date,
+                        account=account,
+                        source_account=pad_account,
+                    )
+            if pad_entry is not None:
+                pad_entry.meta['generated_by'] = "balance-ext"
+                if isinstance(pad_account, str):
+                    pad_entry.meta["pad_account"] = pad_account
+                new_entries.append(pad_entry)
             existing_pad_keys.add(pad_key)
     
     # Parse amount values (Beancount parses amounts as Amount objects)
@@ -275,7 +274,7 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config)
         # Create a Balance directive
         balance_amount = amount.Amount(amount_value, currency)
         balance_entry = data.Balance(
-            meta=data.new_metadata("<balance_extended>", 0),
+            meta=custom_entry.meta.copy(),
             date=custom_entry.date,
             account=account,
             amount=balance_amount,

@@ -5,7 +5,9 @@ __license__ = "GNU GPLv2"
 
 import ast
 import math
+import pprint
 import re
+from dataclasses import dataclass
 from typing import NamedTuple
 
 from beancount.core import account
@@ -25,6 +27,13 @@ DEFAULT_DEFAULT_PAD_ACCOUNT_CONFIG = [
     (r"^.*$", "Expenses:Unattributed:{name}", "Income:Unattributed:{name}"),
 ]
 
+@dataclass
+class RegexToPadAccountMapping:
+    regex: re.Pattern
+    pad_account: str | None = None
+    pad_account_expenses: str | None = None
+    pad_account_income: str | None = None
+
 class PadError(NamedTuple):
     """Represents an error encountered during padding."""
 
@@ -41,8 +50,9 @@ def is_pad_entry(entry, config):
 def get_source_account(pad_entry, diff_position, default_pad_account_config, default_pad_acount_cache):
     """
     Get the source account for a pad entry in the following order of precedence:
-    1. The source account specified in the pad entry metadata
-    2. The source account specified in the default pad account configuration
+    1. The account specified in the pad entry metadata (pad_account)
+    2. The account specified in pad-ext-config statements of matching regex
+    2. The account specified in the default pad account configuration of matching regex
     """
     if pad_entry.meta.get('pad_account'):
         return pad_entry.meta.get('pad_account')
@@ -59,19 +69,86 @@ def get_source_account(pad_entry, diff_position, default_pad_account_config, def
     name = ':'.join(parts[1:])
 
     # default_pad_account_config is sorted in decreasing specificity order
-    for item in default_pad_account_config:        
-        if item[0].match(pad_entry_account):
-            if len(item) == 2:
-                res = item[1].format(name=name)
-            elif len(item) == 3:
+    for mapping in default_pad_account_config:        
+        if mapping.regex.match(pad_entry_account):
+            if mapping.pad_account_expenses and mapping.pad_account_income:
                 if position_sign > 0:
-                    res = item[1].format(name=name)
+                    res = mapping.pad_account_income.format(type=type, name=name)
                 else:
-                    res = item[2].format(name=name)
+                    res = mapping.pad_account_expenses.format(type=type, name=name)
+            elif mapping.pad_account:
+                res = mapping.pad_account.format(type=type, name=name)
+            else:
+                raise ValueError(f"Invalid default pad account configuration: {mapping}")
 
             default_pad_acount_cache[key] = res
             return res
     return None
+
+def get_directives_defined_config(entries, pad_errors):
+    parsed_config = []
+    pad_config_entries = [
+        entry
+        for entry in entries
+        if isinstance(entry, data.Custom) and entry.type == "pad-ext-config"
+    ]
+    for entry in reversed(pad_config_entries):
+        account_regex = entry.meta.get("account_regex")
+        if not account_regex:
+            pad_errors.append(
+                PadError(
+                    entry.meta,
+                    "account_regex is required in config entry",
+                    entry,
+                )
+            )
+            continue
+        compiled_account_regex = None
+        try:
+            compiled_account_regex = re.compile(account_regex)
+        except re.error as e:
+            pad_errors.append(
+                PadError(
+                    entry.meta,
+                    f"Invalid account_regex: {e}",
+                    entry,
+                )
+            )
+            continue
+        expenses_account = entry.meta.get("pad_account_expenses")
+        income_account = entry.meta.get("pad_account_income")
+        pad_account = entry.meta.get("pad_account")
+        if expenses_account and income_account:
+            parsed_config.append(
+                RegexToPadAccountMapping(compiled_account_regex, pad_account_income=income_account, pad_account_expenses=expenses_account)
+            )
+        elif pad_account:
+            parsed_config.append(
+                RegexToPadAccountMapping(compiled_account_regex, pad_account=pad_account)
+            )
+        else:
+            pad_errors.append(
+                PadError(
+                    entry.meta,
+                    "pad-ext-config requires account_regex and (pad_account or pad_account_expenses and pad_account_income)",
+                    entry,
+                )
+            )
+            continue        
+    return parsed_config
+
+
+def parse_pad_account_item(item):
+    if len(item) > 4:
+        raise ValueError(
+            f"Invalid default pad account configuration: {item}. Should be (regex, source_account) or (regex, source_account_positive, source_account_negative) or (regex, source_account_positive, source_account_negative, initial_source_account)"
+        )
+    pattern = re.compile(item[0])
+    if len(item) == 2:
+        return RegexToPadAccountMapping(pattern, pad_account=item[1])
+    elif len(item) >= 3:
+        return RegexToPadAccountMapping(pattern, pad_account_income=item[1], pad_account_expenses=item[2])
+
 
 def pad_extended(entries, options_map, config_str=None):
     """Insert transaction entries for to fulfill a subsequent balance check.
@@ -104,9 +181,13 @@ def pad_extended(entries, options_map, config_str=None):
     default_pad_account_config = []
     # Reverse for convenient checking later
     for item in reversed(config.get('default_pad_account', DEFAULT_DEFAULT_PAD_ACCOUNT_CONFIG)):
-        if len(item) > 4:
-            raise ValueError(f"Invalid default pad account configuration: {item}. Should be (regex, source_account) or (regex, source_account_positive, source_account_negative) or (regex, source_account_positive, source_account_negative, initial_source_account)")    
-        default_pad_account_config.append((re.compile(item[0]),) + item[1:])
+        default_pad_account_config.append(parse_pad_account_item(item))
+
+    directives_account_config = get_directives_defined_config(entries, pad_errors)
+    if pad_errors:
+        return entries, pad_errors
+
+    default_pad_account_config = directives_account_config + default_pad_account_config
     default_pad_acount_cache = {}
 
     # Find all the pad entries and group them by account.
