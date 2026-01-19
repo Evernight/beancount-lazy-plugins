@@ -312,6 +312,8 @@ The plugin will automatically generate the inverse prices:
 ```
 
 ## balance_extended
+*(Experimental, APIs might change slightly in the future)*
+
 A Beancount plugin that adds custom balance operations with a type parameter:
 - **full**: Expand a balance assertion into separate per-currency assertions. For currencies declared in the account's `open` directive but not listed in the custom, a zero balance assertion is generated.
 - **padded**: Creates a `pad` directive on day-1 from a specified pad account, and asserts only the currencies explicitly listed in the directive (does not expand to all declared currencies).
@@ -358,6 +360,8 @@ The balance type can also be specified in a shorter form:
 where ```F``` stands for full, ```~``` stands for padded (```!``` or empty string resolves to regular balance check)
 
 ## pad_extended
+*(Experimental, APIs might change slightly in the future)*
+
 A Beancount plugin that extends standard pad operation.
 1. Pad operation does not generate errors on unused pad entries by default (configurable with `generate_errors_on_unused_pad_entries` option)
 2. Specifying pad account is now not necessary. You can configure default pad account for a set of accounts specified by regular expression.
@@ -383,7 +387,7 @@ Then use it like you would use a pad operation normally
 2015-01-05 balance Assets:Bank:Savings 100 EUR
 ```
 
-(or use ```balance-ext``` with ```padded``` balance type).
+(or use ```balance-ext``` with ```padded``` balance type from [balance_extended](#balance_extended) plugin).
 
 By default it doesn't handle default Pad operations so you will need to use it alongside (```beancount.ops.pad```) plugin. If you want it to process default Pad operations as well, set `handle_default_pad_directives` option to True.
 
@@ -391,10 +395,10 @@ You can configure default pad account for a set of accounts specified by regular
 ```
 2015-01-01 custom "pad-ext-config"
   account_regex: "Assets:Bank:.*"
-  pad_account: "Expenses:Unattributed:{value}"
+  pad_account: "Expenses:Unattributed:{name}"
 }
 ```
-An account specified in ```pad_account``` will be used for all padded accounts matching regular expression. Account name is split into ```type:name```, so for example ```Assets:Bank:Savings``` will be padded with ```Expenses:Unattributed:Bank:Savings``` in this example.
+An account specified in ```pad_account``` will be used for all padded accounts matching regular expression. Account name is split into ```type:name```, so ```Assets:Bank:Savings``` will be padded with ```Expenses:Unattributed:Bank:Savings``` in this example. Ans ```{type}``` would be replaced with ```Assets``` if it was present in the configuration.
 
 Since padding can be either positive or negative, you can alternatively specify different pad accounts for positive and negative padding by adding `pad_account_expenses` and `pad_account_income` metadata to the configuration entry:
 ```
@@ -403,10 +407,9 @@ Since padding can be either positive or negative, you can alternatively specify 
   pad_account_expenses: "Expenses:Unattributed:{name}"
   pad_account_income: "Income:Unattributed:{name}"
 ```
+This will avoid negative expense or positive income postings in the generated pad transactions.
 
-The later configuration directive appears in the file, the more priority it will have for mapping in case account name matches multiple regular expressions.
-
-A pad account specified on the ```pad-ext``` entry metadata has the highest priority.
+The later configuration directive appears in the file, the more priority it will have for mapping in case account name matches multiple regular expressions. A pad account specified directly on the ```pad-ext``` entry ```pad_account``` metadata has the highest priority.
 
 ## tag_from_continuous_events
 A Beancount plugin that automatically applies tags to continuous events. Description of the event directive form the official documentation: https://beancount.github.io/docs/beancount_language_syntax.html#events
