@@ -317,22 +317,22 @@ def parse_balance_extended_entry(custom_entry, config, balance_type_config):
     return BalanceExtended(custom_entry.date, account, balance_type, amount_values)
 
 
-def get_pad_date(date, balance_dates, config):
-    preferred_pad_dates = config.get('preferred_pad_dates')
-    if not preferred_pad_dates:
-        return date - datetime.timedelta(days=1)
-
+def get_pad_and_prev_balance_date(date, balance_dates, config):
     prev_balance_date = None
     index = bisect.bisect_right(balance_dates, date)
     if index > 0:
         prev_balance_date = balance_dates[index - 1]
 
+    preferred_pad_dates = config.get('preferred_pad_dates')
+    if not preferred_pad_dates:
+        return date - datetime.timedelta(days=1), prev_balance_date
+
     for month in [date.month, date.month - 1]:
         for preferred_date in reversed(sorted(preferred_pad_dates)):
             candidate_date = datetime.date(date.year, month, preferred_date)
             if candidate_date < date and candidate_date >= prev_balance_date:
-                return candidate_date
-    return date - datetime.timedelta(days=1)
+                return candidate_date, prev_balance_date
+    return date - datetime.timedelta(days=1), prev_balance_date
 
 def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad_keys, balance_dates_per_account, config):
     """Common logic for processing balance custom operations.
@@ -357,14 +357,21 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
         pad_account = custom_entry.meta.get("pad_account")
 
-        pad_date = get_pad_date(custom_entry.date, balance_dates_per_account[account], config)
+        pad_date, prev_balance_date = get_pad_and_prev_balance_date(custom_entry.date, balance_dates_per_account[account], config)
 
         pad_key = PadKey(pad_date, account)
         if pad_key not in existing_pad_keys:            
             pad_type = config.get('default_pad_type', 'pad-ext')
+            pad_meta = custom_entry.meta.copy()
+            pad_meta['end_balance_date'] = custom_entry.date.isoformat()
+            pad_meta['start_balance_date'] = prev_balance_date.isoformat()
+
+            if isinstance(pad_account, str):
+                pad_meta["pad_account"] = pad_account
+
             if pad_type == 'pad-ext':
                 pad_entry = data.Custom(
-                    meta=custom_entry.meta.copy(),
+                    meta=pad_meta,
                     date=pad_date,
                     type="pad-ext",
                     values=[ValueType(account, dtype=ACCOUNT_TYPE)],
@@ -380,15 +387,12 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
                     pad_entry = None
                 else:
                     pad_entry = data.Pad(
-                        meta=custom_entry.meta.copy(),
+                        meta=pad_meta,
                         date=pad_date,
                         account=account,
                         source_account=pad_account,
                     )
             if pad_entry is not None:
-                pad_entry.meta['generated_by'] = "balance-ext"
-                if isinstance(pad_account, str):
-                    pad_entry.meta["pad_account"] = pad_account
                 new_entries.append(pad_entry)
             existing_pad_keys.add(pad_key)
     

@@ -15,7 +15,7 @@ from beancount_lazy_plugins.balance_extended import (
     balance_extended,
     BalanceExtendedError,
     BalanceType,
-    get_pad_date,
+    get_pad_and_prev_balance_date,
 )
 
 
@@ -381,21 +381,21 @@ class TestBalanceExtended(unittest.TestCase):
         """Prefer configured pad dates within the previous period."""
         config = {"preferred_pad_dates": [1, 15]}
         balance_dates = [datetime.date(2024, 3, 31)]
-        pad_date = get_pad_date(datetime.date(2024, 4, 20), balance_dates, config)
+        pad_date, prev_balance_date = get_pad_and_prev_balance_date(datetime.date(2024, 4, 20), balance_dates, config)
         self.assertEqual(pad_date, datetime.date(2024, 4, 15))
 
     def test_get_pad_date_prefers_configured_dates_for_previous_month_when_balance_present(self):
         """Prefer configured pad dates within the previous period."""
         config = {"preferred_pad_dates": [1, 15]}
         balance_dates = [datetime.date(2024, 3, 31)]
-        pad_date = get_pad_date(datetime.date(2024, 4, 1), balance_dates, config)
+        pad_date, prev_balance_date = get_pad_and_prev_balance_date(datetime.date(2024, 4, 1), balance_dates, config)
         self.assertEqual(pad_date, datetime.date(2024, 3, 31))
 
     def test_get_pad_date_prefers_configured_dates_for_previous_month(self):
         """Prefer configured pad dates within the previous period."""
         config = {"preferred_pad_dates": [1, 15]}
         balance_dates = [datetime.date(2024, 3, 14)]
-        pad_date = get_pad_date(datetime.date(2024, 4, 1), balance_dates, config)
+        pad_date, prev_balance_date = get_pad_and_prev_balance_date(datetime.date(2024, 4, 1), balance_dates, config)
         self.assertEqual(pad_date, datetime.date(2024, 3, 15))
 
     def test_build_account_currencies_mapping(self):
