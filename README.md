@@ -359,6 +359,14 @@ The balance type can also be specified in a shorter form:
 
 where ```F``` stands for full, ```~``` stands for padded (```!``` or empty string resolves to regular balance check)
 
+You can also set a default balance type per account using configuration directives:
+```
+2015-01-01 custom "balance-ext-config" "config"
+  account_regex: "Assets:.*"
+  balance_type: "full-padded"
+```
+The last matching configuration directive in the file takes precedence.
+
 ## pad_extended
 *(Experimental, APIs might change slightly in the future)*
 

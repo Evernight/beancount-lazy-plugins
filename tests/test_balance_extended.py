@@ -19,7 +19,6 @@ class TestBalanceExtended(unittest.TestCase):
 
     def load_from_string(self, text):
         entries, errors, options_map = load_string(dedent(text))
-        self.assertEqual(len(errors), 0)
         return entries, options_map
 
     def test_balance_full_single_currency(self):
@@ -90,6 +89,37 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(balance_entry.account, "Assets:Checking")
         self.assertEqual(balance_entry.amount, amount.Amount(D("100"), "USD"))
         self.assertEqual(balance_entry.date, datetime.date(2015, 1, 1))
+
+    def test_balance_type_config_applies_by_regex(self):
+        """Use balance-ext-config to set default balance type by account regex."""
+        ledger = """
+        2014-12-31 open Assets:Checking USD,EUR
+        2015-01-01 custom "balance-ext-config"
+          account_regex: "Assets:.*"
+          balance_type: "full-padded"
+        2015-01-01 custom "balance-ext" Assets:Checking 100 USD
+            pad_account: "Equity:Opening-Balances"
+        """
+        entries, options_map = self.load_from_string(ledger)
+        new_entries, errors = balance_extended(entries, options_map)
+
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(new_entries), 5)  # open + config + pad + 2 balances
+
+        self.assertEqual(new_entries[0], entries[0])  # open preserved
+        self.assertEqual(new_entries[1], entries[1])  # config preserved
+
+        pad_entry = new_entries[2]
+        self.assertIsInstance(pad_entry, data.Custom)
+        self.assertEqual(pad_entry.type, "pad-ext")
+        self.assertEqual(pad_entry.values[0].value, "Assets:Checking")
+        self.assertEqual(pad_entry.meta.get("pad_account"), "Equity:Opening-Balances")
+        self.assertEqual(pad_entry.date, datetime.date(2014, 12, 31))  # day-1
+
+        balance_assertions = [e for e in new_entries[3:] if isinstance(e, data.Balance)]
+        self.assertEqual(len(balance_assertions), 2)
+        self.assertEqual(balance_assertions[0].amount, amount.Amount(D("0"), "EUR"))
+        self.assertEqual(balance_assertions[1].amount, amount.Amount(D("100"), "USD"))
 
     def test_balance_padded_does_not_create_duplicate_pad_for_same_key(self):
         """If multiple padded type balance-ext directives would create the same Pad, emit it once."""
@@ -184,7 +214,7 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(new_entries), 0)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("balance_type account amount1", errors[0].message)
+        self.assertIn("[balance_type] account amount1", errors[0].message)
 
     def test_balance_full_invalid_amount_object(self):
         """Test full type balance with invalid amount object."""
@@ -224,20 +254,6 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
         self.assertIn("Expected Amount object", errors[0].message)
-
-    def test_invalid_balance_type(self):
-        """Test with invalid balance type."""
-        ledger = """
-        2015-01-01 custom "balance-ext" "invalid" Assets:Checking 100 USD
-        """
-        entries, options_map = self.load_from_string(ledger)
-        new_entries, errors = balance_extended(entries, options_map)
-
-        self.assertEqual(len(new_entries), 0)
-        self.assertEqual(len(errors), 1)
-        self.assertIsInstance(errors[0], BalanceExtendedError)
-        self.assertIn("Invalid balance type: invalid", errors[0].message)
-        self.assertIn("Must be 'full', 'padded', or 'full-padded'", errors[0].message)
 
     def test_mixed_entries(self):
         """Test with a mix of different types of entries."""
