@@ -11,7 +11,12 @@ from beancount.core import data
 from beancount.core import amount
 from beancount.core.number import D
 from beancount.loader import load_string
-from beancount_lazy_plugins.balance_extended import balance_extended, BalanceExtendedError, BalanceType
+from beancount_lazy_plugins.balance_extended import (
+    balance_extended,
+    BalanceExtendedError,
+    BalanceType,
+    get_pad_date,
+)
 
 
 class TestBalanceExtended(unittest.TestCase):
@@ -371,6 +376,27 @@ class TestBalanceExtended(unittest.TestCase):
         balance_assertions = [e for e in new_entries[1:] if isinstance(e, data.Balance)]
         self.assertEqual(len(balance_assertions), 1)
         self.assertEqual(balance_assertions[0].amount, amount.Amount(D("100"), "USD"))
+
+    def test_get_pad_date_prefers_configured_dates(self):
+        """Prefer configured pad dates within the previous period."""
+        config = {"preferred_pad_dates": [1, 15]}
+        balance_dates = [datetime.date(2024, 3, 31)]
+        pad_date = get_pad_date(datetime.date(2024, 4, 20), balance_dates, config)
+        self.assertEqual(pad_date, datetime.date(2024, 4, 15))
+
+    def test_get_pad_date_prefers_configured_dates_for_previous_month_when_balance_present(self):
+        """Prefer configured pad dates within the previous period."""
+        config = {"preferred_pad_dates": [1, 15]}
+        balance_dates = [datetime.date(2024, 3, 31)]
+        pad_date = get_pad_date(datetime.date(2024, 4, 1), balance_dates, config)
+        self.assertEqual(pad_date, datetime.date(2024, 3, 31))
+
+    def test_get_pad_date_prefers_configured_dates_for_previous_month(self):
+        """Prefer configured pad dates within the previous period."""
+        config = {"preferred_pad_dates": [1, 15]}
+        balance_dates = [datetime.date(2024, 3, 14)]
+        pad_date = get_pad_date(datetime.date(2024, 4, 1), balance_dates, config)
+        self.assertEqual(pad_date, datetime.date(2024, 3, 15))
 
     def test_build_account_currencies_mapping(self):
         """Test the build_account_currencies_mapping function directly."""

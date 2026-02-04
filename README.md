@@ -367,6 +367,14 @@ You can also set a default balance type per account using configuration directiv
 ```
 The last matching configuration directive in the file takes precedence.
 
+There's also an option to specify preferred pad dates in the config:
+```
+2015-01-01 custom "balance-ext-config" "config"
+  preferred_pad_dates: [1, 15]
+```
+These dates will be preferred instead of the previous day when generating pad entries, unless it crosses the previous balance entry for that account.
+This is useful when you want pad operations to appear on specific dates, for example for more consistent behaviour when using filters in Fava.
+
 ## pad_extended
 *(Experimental, APIs might change slightly in the future)*
 

@@ -20,6 +20,7 @@ The Account "Open" instruction should specify all of the currencies used.
 """
 
 import ast
+import bisect
 import collections
 import copy
 import datetime
@@ -127,16 +128,37 @@ def balance_extended(entries, options_map, config_str=None):
     # Build mapping of account currencies from Open directives
     account_currencies = build_account_currencies_mapping(entries)
 
+    balance_extended_parsed_entries = {}
+    for entry in entries:
+        if isinstance(entry, data.Custom) and entry.type == "balance-ext":
+            try:
+                balance_extended_parsed_entries[id(entry)] = parse_balance_extended_entry(entry, config, balance_type_config)
+            except BalanceExtendedError as exc:
+                errors.append(exc)
+
+    balance_dates_per_account = collections.defaultdict(list)
+    for entry in entries:
+        if isinstance(entry, data.Balance):
+            balance_dates_per_account[entry.account].append(entry.date)
+    for entry in balance_extended_parsed_entries.values():
+        balance_dates_per_account[entry.account].append(entry.date)
+    for account in balance_dates_per_account:
+        balance_dates_per_account[account].sort()
+
     for entry in entries:
         if isinstance(entry, data.Custom):
             if entry.type == "balance-ext":
-                # Process balance custom operation
+                if not id(entry) in balance_extended_parsed_entries:
+                    # already in errors, just skip here
+                    continue
+
                 balance_entries, entry_errors = process_balance(
+                    balance_extended_parsed_entries[id(entry)],
                     entry,
                     account_currencies,
                     existing_pad_keys,
+                    balance_dates_per_account,
                     config,
-                    balance_type_config,
                 )
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
@@ -295,27 +317,37 @@ def parse_balance_extended_entry(custom_entry, config, balance_type_config):
     return BalanceExtended(custom_entry.date, account, balance_type, amount_values)
 
 
-def process_balance(custom_entry, account_currencies, existing_pad_keys, config, balance_type_config):
+def get_pad_date(date, balance_dates, config):
+    preferred_pad_dates = config.get('preferred_pad_dates')
+    if not preferred_pad_dates:
+        return date - datetime.timedelta(days=1)
+
+    prev_balance_date = None
+    index = bisect.bisect_right(balance_dates, date)
+    if index > 0:
+        prev_balance_date = balance_dates[index - 1]
+
+    for month in [date.month, date.month - 1]:
+        for preferred_date in reversed(sorted(preferred_pad_dates)):
+            candidate_date = datetime.date(date.year, month, preferred_date)
+            if candidate_date < date and candidate_date >= prev_balance_date:
+                return candidate_date
+    return date - datetime.timedelta(days=1)
+
+def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad_keys, balance_dates_per_account, config):
     """Common logic for processing balance custom operations.
     
     Args:
       custom_entry: A Custom directive with type "balance-ext"
       account_currencies: Dictionary mapping account names to sets of currencies
       existing_pad_keys: A mutable set of already-seen pad keys to avoid duplicates
+      balance_dates_per_account: A dictionary mapping account names to sets of dates
       config: A dictionary of configuration options
     Returns:
       A tuple of (list of new entries, list of errors)
     """
     errors = []
     new_entries = []
-
-    try:
-        parsed_entry = parse_balance_extended_entry(
-            custom_entry, config, balance_type_config
-        )
-    except BalanceExtendedError as exc:
-        errors.append(exc)
-        return new_entries, errors
 
     account = parsed_entry.account
     balance_type = parsed_entry.balance_type
@@ -325,7 +357,8 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config,
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
         pad_account = custom_entry.meta.get("pad_account")
 
-        pad_date = custom_entry.date - datetime.timedelta(days=1)        
+        pad_date = get_pad_date(custom_entry.date, balance_dates_per_account[account], config)
+
         pad_key = PadKey(pad_date, account)
         if pad_key not in existing_pad_keys:            
             pad_type = config.get('default_pad_type', 'pad-ext')
