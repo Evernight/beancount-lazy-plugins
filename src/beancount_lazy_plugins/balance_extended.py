@@ -55,13 +55,23 @@ BALANCE_TYPE_MAPPINGS = {
     "F!": BalanceType.FULL.value,
 }
 
-BalanceExtendedError = collections.namedtuple(
-    "BalanceExtendedError", "source message entry"
-)
+class BalanceExtendedError(Exception):
+    def __init__(self, source, message, entry):
+        super().__init__(message)
+        self.source = source
+        self.message = message
+        self.entry = entry
 
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
+
+
+class BalanceExtended(NamedTuple):
+    date: datetime.date
+    account: str
+    balance_type: BalanceType
+    amount_values: list
 
 
 class BalanceTypeConfig(NamedTuple):
@@ -116,7 +126,7 @@ def balance_extended(entries, options_map, config_str=None):
     
     # Build mapping of account currencies from Open directives
     account_currencies = build_account_currencies_mapping(entries)
-    
+
     for entry in entries:
         if isinstance(entry, data.Custom):
             if entry.type == "balance-ext":
@@ -217,9 +227,7 @@ def get_directives_defined_config(entries, errors):
     return parsed_config
 
 
-def parse_balance_account_and_type(custom_entry, config, balance_type_config):
-    errors = []
-
+def parse_balance_extended_entry(custom_entry, config, balance_type_config):
     values = custom_entry.values or []
     type_value = None
     if values and isinstance(values[0].value, str):
@@ -234,26 +242,30 @@ def parse_balance_account_and_type(custom_entry, config, balance_type_config):
     values_start_index = account_index + 1
 
     if len(values) < min_args:
-        errors.append(BalanceExtendedError(
+        raise BalanceExtendedError(
             custom_entry.meta,
             f"balance-ext requires at least {expected_format}",
             custom_entry
-        ))
-        return None, None, None, errors
+        )
 
     account = values[account_index].value
     if not isinstance(account, str):
-        errors.append(BalanceExtendedError(
+        raise BalanceExtendedError(
             custom_entry.meta,
             "Second argument to balance-ext must be an account name (string)",
             custom_entry
-        ))
-        return None, None, None, errors
+        )
 
     if type_given:
         balance_type_str = type_value
         if balance_type_str in BALANCE_TYPE_MAPPINGS:
             balance_type_str = BALANCE_TYPE_MAPPINGS[balance_type_str]
+        elif balance_type_str not in BALANCE_TYPE_MAPPINGS.values():
+            raise BalanceExtendedError(
+                custom_entry.meta,
+                f"Invalid balance type: {balance_type_str}. Must be 'full', 'padded', or 'full-padded'",
+                custom_entry
+            )
     else:
         balance_type_str = None
         for mapping in balance_type_config:
@@ -264,25 +276,23 @@ def parse_balance_account_and_type(custom_entry, config, balance_type_config):
             balance_type_str = config.get("default_balance_type", BalanceType.REGULAR.value)
 
     if not isinstance(balance_type_str, str):
-        errors.append(BalanceExtendedError(
+        raise BalanceExtendedError(
             custom_entry.meta,
             "balance_ext default_balance_type must be a string",
             custom_entry
-        ))
-        return None, None, None, errors
+        )
 
     try:
         balance_type = BalanceType(balance_type_str)
     except ValueError:
-        errors.append(BalanceExtendedError(
+        raise BalanceExtendedError(
             custom_entry.meta,
             f"Invalid balance type: {balance_type_str}. Must be 'full', 'padded', or 'full-padded'",
             custom_entry
-        ))
-        return None, None, None, errors
+        )
 
     amount_values = values[values_start_index:]
-    return account, balance_type, amount_values, errors
+    return BalanceExtended(custom_entry.date, account, balance_type, amount_values)
 
 
 def process_balance(custom_entry, account_currencies, existing_pad_keys, config, balance_type_config):
@@ -299,12 +309,17 @@ def process_balance(custom_entry, account_currencies, existing_pad_keys, config,
     errors = []
     new_entries = []
 
-    account, balance_type, amount_values, header_errors = parse_balance_account_and_type(
-        custom_entry, config, balance_type_config
-    )
-    if header_errors:
-        errors.extend(header_errors)
+    try:
+        parsed_entry = parse_balance_extended_entry(
+            custom_entry, config, balance_type_config
+        )
+    except BalanceExtendedError as exc:
+        errors.append(exc)
         return new_entries, errors
+
+    account = parsed_entry.account
+    balance_type = parsed_entry.balance_type
+    amount_values = parsed_entry.amount_values
 
     # Add pad entry for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
