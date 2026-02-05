@@ -301,8 +301,8 @@ def valuation(entries, options_map, config_str=None):
             prices.append(price)
 
             # Update fields for easier debugging with Fava
-            entry.meta['lastBalance'] = last_balance
-            entry.meta['calculatedPrice'] = valuation_amount.number / last_balance
+            entry.meta['currencyBalance'] = Amount(last_balance, valuation_currency)
+            entry.meta['currencyPrice'] = Amount(valuation_amount.number / last_balance, valuation_amount.currency)
             new_entries.append(entry)
         elif isinstance(entry, Commodity):
             # Just keep track of all the commodities defined in the ledger
