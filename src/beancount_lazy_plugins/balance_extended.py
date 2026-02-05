@@ -268,7 +268,7 @@ def parse_balance_extended_entry(custom_entry, config, balance_type_config):
     if len(values) < min_args:
         raise BalanceExtendedError(
             custom_entry.meta,
-            f"balance-ext requires at least {expected_format}",
+            f"balance-ext requires the following arguments: {expected_format}",
             custom_entry
         )
 
