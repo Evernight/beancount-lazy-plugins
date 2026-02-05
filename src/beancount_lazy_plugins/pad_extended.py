@@ -5,7 +5,6 @@ __license__ = "GNU GPLv2"
 
 import ast
 import math
-import pprint
 import re
 from dataclasses import dataclass
 from typing import NamedTuple

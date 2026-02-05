@@ -44,6 +44,7 @@ class BalanceType(Enum):
     FULL = "full"
     PADDED = "padded"
     FULL_PADDED = "full-padded"
+    VALUATION = "valuation"
 
 BALANCE_TYPE_MAPPINGS = {    
     "": BalanceType.REGULAR.value,
@@ -54,6 +55,7 @@ BALANCE_TYPE_MAPPINGS = {
     "!": BalanceType.REGULAR.value,
     "!F": BalanceType.FULL.value,
     "F!": BalanceType.FULL.value,
+    "V": BalanceType.VALUATION.value,
 }
 
 class BalanceExtendedError(Exception):
@@ -318,21 +320,22 @@ def parse_balance_extended_entry(custom_entry, config, balance_type_config):
 
 
 def get_pad_and_prev_balance_date(date, balance_dates, config):
+    date_minus_one = date - datetime.timedelta(days=1)
     prev_balance_date = None
-    index = bisect.bisect_right(balance_dates, date)
+    index = bisect.bisect_right(balance_dates, date_minus_one)
     if index > 0:
         prev_balance_date = balance_dates[index - 1]
 
     preferred_pad_dates = config.get('preferred_pad_dates')
     if not preferred_pad_dates:
-        return date - datetime.timedelta(days=1), prev_balance_date
+        return date_minus_one, prev_balance_date
 
     for month in [date.month, date.month - 1]:
         for preferred_date in reversed(sorted(preferred_pad_dates)):
             candidate_date = datetime.date(date.year, month, preferred_date)
             if candidate_date < date and candidate_date >= prev_balance_date:
                 return candidate_date, prev_balance_date
-    return date - datetime.timedelta(days=1), prev_balance_date
+    return date_minus_one, prev_balance_date
 
 def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad_keys, balance_dates_per_account, config):
     """Common logic for processing balance custom operations.
@@ -353,6 +356,16 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
     balance_type = parsed_entry.balance_type
     amount_values = parsed_entry.amount_values
 
+    # For valuation type, just add a valuation entry
+    if balance_type == BalanceType.VALUATION:
+        new_entries.append(data.Custom(
+            meta=custom_entry.meta.copy(),
+            date=custom_entry.date,
+            type="valuation",
+            values=[ValueType(account, dtype=ACCOUNT_TYPE), amount_values[0]],
+        ))
+        return new_entries, errors
+
     # Add pad entry for padded balances
     if balance_type == BalanceType.PADDED or balance_type == BalanceType.FULL_PADDED:
         pad_account = custom_entry.meta.get("pad_account")
@@ -364,7 +377,7 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
             pad_type = config.get('default_pad_type', 'pad-ext')
             pad_meta = custom_entry.meta.copy()
             pad_meta['end_balance_date'] = custom_entry.date.isoformat()
-            pad_meta['start_balance_date'] = prev_balance_date.isoformat()
+            pad_meta['start_balance_date'] = prev_balance_date.isoformat() if prev_balance_date else None
 
             if isinstance(pad_account, str):
                 pad_meta["pad_account"] = pad_account
