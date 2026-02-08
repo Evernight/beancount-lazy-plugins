@@ -22,11 +22,9 @@ The Account "Open" instruction should specify all of the currencies used.
 import ast
 import bisect
 import collections
-import copy
 import datetime
 import re
 from decimal import Decimal
-from enum import Enum
 from typing import NamedTuple
 
 from beancount.core import data
@@ -36,50 +34,20 @@ from beancount.parser.grammar import ValueType
 
 from beancount.core.account import TYPE as ACCOUNT_TYPE
 
+from .common import (
+    BalanceType,
+    BALANCE_TYPE_MAPPINGS,
+    BalanceExtendedError,
+    BalanceExtended,
+    BalanceTypeConfig,
+    parse_balance_extended_entry,
+)
+
 __plugins__ = ["balance_extended"]
-
-class BalanceType(Enum):
-    """Enum for balance operation types."""
-    REGULAR = "regular"
-    FULL = "full"
-    PADDED = "padded"
-    FULL_PADDED = "full-padded"
-    VALUATION = "valuation"
-
-BALANCE_TYPE_MAPPINGS = {    
-    "": BalanceType.REGULAR.value,
-    "F": BalanceType.FULL.value,
-    "~": BalanceType.PADDED.value,
-    "F~": BalanceType.FULL_PADDED.value,
-    "~F": BalanceType.FULL_PADDED.value,
-    "!": BalanceType.REGULAR.value,
-    "!F": BalanceType.FULL.value,
-    "F!": BalanceType.FULL.value,
-    "V": BalanceType.VALUATION.value,
-}
-
-class BalanceExtendedError(Exception):
-    def __init__(self, source, message, entry):
-        super().__init__(message)
-        self.source = source
-        self.message = message
-        self.entry = entry
 
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
-
-
-class BalanceExtended(NamedTuple):
-    date: datetime.date
-    account: str
-    balance_type: BalanceType
-    amount_values: list
-
-
-class BalanceTypeConfig(NamedTuple):
-    regex: re.Pattern
-    balance_type: str
 
 
 def balance_extended(entries, options_map, config_str=None):
@@ -249,74 +217,6 @@ def get_directives_defined_config(entries, errors):
             continue
         parsed_config.append(BalanceTypeConfig(compiled_account_regex, balance_type))
     return parsed_config
-
-
-def parse_balance_extended_entry(custom_entry, config, balance_type_config):
-    values = custom_entry.values or []
-    type_value = None
-    if values and isinstance(values[0].value, str):
-        candidate = values[0].value
-        if candidate in BALANCE_TYPE_MAPPINGS or candidate in BALANCE_TYPE_MAPPINGS.values():
-            type_value = candidate
-
-    type_given = type_value is not None
-    min_args = 3 if type_given else 2  # [type] + account + amount
-    expected_format = "[balance_type] account amount1 [amount2 ...]"
-    account_index = 1 if type_given else 0
-    values_start_index = account_index + 1
-
-    if len(values) < min_args:
-        raise BalanceExtendedError(
-            custom_entry.meta,
-            f"balance-ext requires the following arguments: {expected_format}",
-            custom_entry
-        )
-
-    account = values[account_index].value
-    if not isinstance(account, str):
-        raise BalanceExtendedError(
-            custom_entry.meta,
-            "Second argument to balance-ext must be an account name (string)",
-            custom_entry
-        )
-
-    if type_given:
-        balance_type_str = type_value
-        if balance_type_str in BALANCE_TYPE_MAPPINGS:
-            balance_type_str = BALANCE_TYPE_MAPPINGS[balance_type_str]
-        elif balance_type_str not in BALANCE_TYPE_MAPPINGS.values():
-            raise BalanceExtendedError(
-                custom_entry.meta,
-                f"Invalid balance type: {balance_type_str}. Must be 'full', 'padded', or 'full-padded'",
-                custom_entry
-            )
-    else:
-        balance_type_str = None
-        for mapping in balance_type_config:
-            if mapping.regex.match(account):
-                balance_type_str = mapping.balance_type
-                break
-        if balance_type_str is None:
-            balance_type_str = config.get("default_balance_type", BalanceType.REGULAR.value)
-
-    if not isinstance(balance_type_str, str):
-        raise BalanceExtendedError(
-            custom_entry.meta,
-            "balance_ext default_balance_type must be a string",
-            custom_entry
-        )
-
-    try:
-        balance_type = BalanceType(balance_type_str)
-    except ValueError:
-        raise BalanceExtendedError(
-            custom_entry.meta,
-            f"Invalid balance type: {balance_type_str}. Must be 'full', 'padded', or 'full-padded'",
-            custom_entry
-        )
-
-    amount_values = values[values_start_index:]
-    return BalanceExtended(custom_entry.date, account, balance_type, amount_values)
 
 
 def get_pad_and_prev_balance_date(date, balance_dates, config):
