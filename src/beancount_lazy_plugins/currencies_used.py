@@ -52,6 +52,7 @@ def currencies_used(entries, options_map, config_str=None):
             return entries, errors
     
     extend_open_directives = config.get('extend_open_directives', False)
+    allow_extending_already_defined = config.get('allow_extending_already_defined', False)
     extend_from_pad_directives = config.get('extend_from_pad_directives', True)
     
     # Track currencies used per account
@@ -105,12 +106,15 @@ def currencies_used(entries, options_map, config_str=None):
                         # Create error for mismatch
                         defined_sorted = sorted(list(defined_currencies))
                         used_sorted = sorted(list(used_currencies))
-                        errors.append(CurrenciesUsedError(
-                            source=entry.meta,
-                            message=f"Account {account}: defined currencies {defined_sorted} "
-                                   f"do not match used currencies {used_sorted}",
-                            entry=entry
-                        ))
+                        if allow_extending_already_defined:
+                            new_currencies = sorted_used_currencies
+                        else:
+                            errors.append(CurrenciesUsedError(
+                                source=entry.meta,
+                                message=f"Account {account}: defined currencies {defined_sorted} "
+                                    f"do not match used currencies {used_sorted}",
+                                entry=entry
+                            ))
             
             # Create new Open directive
             new_open = data.Open(
