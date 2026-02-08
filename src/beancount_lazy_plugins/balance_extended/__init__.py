@@ -354,5 +354,11 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
             diff_amount=None
         )
         new_entries.append(balance_entry)
+    if not currencies_to_assert:
+        errors.append(BalanceExtendedError(
+            custom_entry.meta,
+            f"No currencies to assert for account {account}",
+            custom_entry,
+        ))
     
     return new_entries, errors
