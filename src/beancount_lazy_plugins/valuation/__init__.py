@@ -34,6 +34,8 @@ from beancount.parser import printer
 # see "intercept_book" function
 from beancount.parser import booking_full
 
+from .common import ValuationError, ParsedValuation, parse_valuation_entry
+
 def round_down(value, decimals):
     with decimal.localcontext() as ctx:
         d = decimal.Decimal(value)
@@ -257,10 +259,18 @@ def valuation(entries, options_map, config_str=None):
         elif (
             isinstance(entry, Custom)
             and entry.type == "valuation"
+            and entry.values
             and entry.values[0].value != "config"
         ):
-            account, valuation_amount = entry.values
-            account = account.value
+            try:
+                parsed = parse_valuation_entry(entry)
+            except ValuationError as exc:
+                plugin_errors.append(
+                    ValuationPluginError(exc.source, exc.message, exc.entry)
+                )
+                continue
+            account = parsed.account
+            valuation_amount = parsed.amount
 
             if account not in account_mapping:
                 plugin_errors.append(
@@ -273,7 +283,6 @@ def valuation(entries, options_map, config_str=None):
                 )
                 continue
             valuation_currency, pnl_account = account_mapping[account]
-            valuation_amount = valuation_amount.value
             last_balance = balances[account]
 
             if abs(last_balance) < EPSILON:
