@@ -100,7 +100,7 @@ def balance_extended(entries, options_map, config_str=None):
 
     balance_extended_parsed_entries = {}
     for entry in entries:
-        if isinstance(entry, data.Custom) and entry.type == "balance-ext":
+        if isinstance(entry, data.Custom) and entry.type == "balance-ext" and not _is_balance_ext_config(entry):
             try:
                 balance_extended_parsed_entries[id(entry)] = parse_balance_extended_entry(entry, config, balance_type_config)
             except BalanceExtendedError as exc:
@@ -117,7 +117,7 @@ def balance_extended(entries, options_map, config_str=None):
 
     for entry in entries:
         if isinstance(entry, data.Custom):
-            if entry.type == "balance-ext":
+            if entry.type == "balance-ext" and not _is_balance_ext_config(entry):
                 if not id(entry) in balance_extended_parsed_entries:
                     # already in errors, just skip here
                     continue
@@ -133,7 +133,7 @@ def balance_extended(entries, options_map, config_str=None):
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
             else:
-                # Keep other custom directives as-is
+                # Keep config and other custom directives as-is
                 new_entries.append(entry)
         else:
             # Keep all non-custom directives as-is
@@ -163,12 +163,23 @@ def build_account_currencies_mapping(entries):
     return account_currencies
 
 
+def _is_balance_ext_config(entry):
+    """Check if a Custom entry is a balance-ext config directive."""
+    return (
+        isinstance(entry, data.Custom)
+        and entry.type == "balance-ext"
+        and entry.values
+        and isinstance(entry.values[0].value, str)
+        and entry.values[0].value == "config"
+    )
+
+
 def get_directives_defined_config(entries, errors):
     parsed_config = []
     config_entries = [
         entry
         for entry in entries
-        if isinstance(entry, data.Custom) and entry.type == "balance-ext-config"
+        if _is_balance_ext_config(entry)
     ]
     for entry in reversed(config_entries):
         account_regex = entry.meta.get("account_regex")
@@ -176,7 +187,7 @@ def get_directives_defined_config(entries, errors):
             errors.append(
                 BalanceExtendedError(
                     entry.meta,
-                    "account_regex is required in balance-ext-config entry",
+                    "account_regex is required in balance-ext config entry",
                     entry,
                 )
             )
@@ -197,7 +208,7 @@ def get_directives_defined_config(entries, errors):
             errors.append(
                 BalanceExtendedError(
                     entry.meta,
-                    "balance_type is required in balance-ext-config entry",
+                    "balance_type is required in balance-ext config entry",
                     entry,
                 )
             )

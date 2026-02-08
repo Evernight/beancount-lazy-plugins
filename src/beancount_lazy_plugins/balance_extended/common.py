@@ -76,6 +76,15 @@ def parse_balance_extended_entry(custom_entry, config=None, balance_type_config=
         balance_type_config = []
 
     values = custom_entry.values or []
+
+    # Reject config entries — they use the same directive type but are not balance entries
+    if values and isinstance(values[0].value, str) and values[0].value == "config":
+        raise BalanceExtendedError(
+            custom_entry.meta,
+            "balance-ext config entries should not be parsed as balance entries",
+            custom_entry,
+        )
+
     type_value = None
     if values and isinstance(values[0].value, str):
         candidate = values[0].value

@@ -96,10 +96,10 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(balance_entry.date, datetime.date(2015, 1, 1))
 
     def test_balance_type_config_applies_by_regex(self):
-        """Use balance-ext-config to set default balance type by account regex."""
+        """Use balance-ext config to set default balance type by account regex."""
         ledger = """
         2014-12-31 open Assets:Checking USD,EUR
-        2015-01-01 custom "balance-ext-config"
+        2015-01-01 custom "balance-ext" "config"
           account_regex: "Assets:.*"
           balance_type: "full-padded"
         2015-01-01 custom "balance-ext" Assets:Checking 100 USD

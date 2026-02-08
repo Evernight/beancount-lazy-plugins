@@ -361,7 +361,7 @@ where ```F``` stands for full, ```~``` stands for padded (```!``` or empty strin
 
 You can also set a default balance type per account using configuration directives:
 ```
-2015-01-01 custom "balance-ext-config" "config"
+2015-01-01 custom "balance-ext" "config"
   account_regex: "Assets:.*"
   balance_type: "full-padded"
 ```
@@ -369,7 +369,7 @@ The last matching configuration directive in the file takes precedence.
 
 There's also an option to specify preferred pad dates in the config:
 ```
-2015-01-01 custom "balance-ext-config" "config"
+2015-01-01 custom "balance-ext" "config"
   preferred_pad_dates: [1, 15]
 ```
 These dates will be preferred instead of the previous day when generating pad entries, unless it crosses the previous balance entry for that account.
