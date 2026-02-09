@@ -377,6 +377,58 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertEqual(len(balance_assertions), 1)
         self.assertEqual(balance_assertions[0].amount, amount.Amount(D("100"), "USD"))
 
+    def test_balance_type_config_last_directive_wins(self):
+        """Last balance-ext config directive should take precedence."""
+        from beancount_lazy_plugins.balance_extended.common import (
+            get_directives_defined_config,
+            resolve_account_balance_type,
+        )
+
+        ledger = """
+        2014-12-31 open Assets:Bank:Checking USD
+        2014-12-31 open Assets:Bank:Savings USD
+        2014-12-31 open Assets:Brokerage USD
+        2014-12-31 open Assets:Cash USD
+        2014-12-31 open Liabilities:Card USD
+
+        2015-01-01 custom "balance-ext" "config"
+          account_regex: "Assets:.*"
+          balance_type: "full"
+        2015-01-02 custom "balance-ext" "config"
+          account_regex: "Assets:Bank:.*"
+          balance_type: "padded"
+        2015-01-03 custom "balance-ext" "config"
+          account_regex: "Assets:Bank:Checking"
+          balance_type: "full-padded"
+        """
+        entries, _ = self.load_from_string(ledger)
+        errors: list[BalanceExtendedError] = []
+        config = get_directives_defined_config(entries, errors)
+
+        self.assertEqual(errors, [])
+
+        default_type = BalanceType.REGULAR.value
+        self.assertEqual(
+            resolve_account_balance_type("Assets:Bank:Checking", config, default_type),
+            "full-padded",
+        )
+        self.assertEqual(
+            resolve_account_balance_type("Assets:Bank:Savings", config, default_type),
+            "padded",
+        )
+        self.assertEqual(
+            resolve_account_balance_type("Assets:Brokerage", config, default_type),
+            "full",
+        )
+        self.assertEqual(
+            resolve_account_balance_type("Assets:Cash", config, default_type),
+            "full",
+        )
+        self.assertEqual(
+            resolve_account_balance_type("Liabilities:Card", config, default_type),
+            "regular",
+        )
+
     def test_get_pad_date_prefers_configured_dates(self):
         """Prefer configured pad dates within the previous period."""
         config = {"preferred_pad_dates": [1, 15]}

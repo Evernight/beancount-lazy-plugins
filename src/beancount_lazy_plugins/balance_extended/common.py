@@ -88,6 +88,7 @@ def get_directives_defined_config(entries, errors):
         for entry in entries
         if is_balance_ext_config(entry)
     ]
+    # Reversed so that the last config entry takes precedence over the previous ones
     for entry in reversed(config_entries):
         account_regex = entry.meta.get("account_regex")
         if not account_regex:
@@ -143,6 +144,7 @@ def resolve_account_balance_type(
     default_balance_type: str,
 ) -> str:
     """Resolve the default balance type for a single account."""
+    # Remember that the order of directives is reversed, so the last config entry takes precedence over the previous ones
     for config_entry in balance_type_config:
         if config_entry.regex.match(account):
             return config_entry.balance_type
