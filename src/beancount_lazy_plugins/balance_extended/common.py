@@ -137,23 +137,32 @@ def get_directives_defined_config(entries, errors):
     return parsed_config
 
 
-def build_account_type_mapping(
-    accounts: list[str],
+def resolve_account_balance_type(
+    account: str,
     balance_type_config: list[BalanceTypeConfig],
     default_balance_type: str,
-) -> dict[str, str]:
-    """Precompute default balance type per account."""
-    mapping: dict[str, str] = {}
-    for account in accounts:
-        account_type = None
-        for config_entry in balance_type_config:
-            if config_entry.regex.match(account):
-                account_type = config_entry.balance_type
-                break
-        if account_type is None:
-            account_type = default_balance_type
-        mapping[account] = account_type
-    return mapping
+) -> str:
+    """Resolve the default balance type for a single account."""
+    for config_entry in balance_type_config:
+        if config_entry.regex.match(account):
+            return config_entry.balance_type
+    return default_balance_type
+
+
+def ensure_account_balance_type(
+    account: str,
+    account_to_type_mapping: dict[str, str],
+    balance_type_config: list[BalanceTypeConfig],
+    default_balance_type: str,
+) -> str:
+    """Ensure the account->type mapping contains an entry and return it."""
+    if account not in account_to_type_mapping:
+        account_to_type_mapping[account] = resolve_account_balance_type(
+            account,
+            balance_type_config,
+            default_balance_type,
+        )
+    return account_to_type_mapping[account]
 
 
 def parse_balance_extended_entry(
@@ -210,16 +219,12 @@ def parse_balance_extended_entry(
                 custom_entry
             )
     else:
-        if account not in account_to_type_mapping:
-            account_type = None
-            for config_entry in balance_type_config:
-                if config_entry.regex.match(account):
-                    account_type = config_entry.balance_type
-                    break
-            if account_type is None:
-                account_type = default_balance_type
-            account_to_type_mapping[account] = account_type
-        balance_type_str = account_to_type_mapping[account]
+        balance_type_str = ensure_account_balance_type(
+            account,
+            account_to_type_mapping,
+            balance_type_config,
+            default_balance_type,
+        )
 
     if not isinstance(balance_type_str, str):
         raise BalanceExtendedError(
