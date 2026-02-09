@@ -23,8 +23,6 @@ import ast
 import bisect
 import collections
 import datetime
-import re
-from decimal import Decimal
 from typing import NamedTuple
 
 from beancount.core import data
@@ -36,10 +34,11 @@ from beancount.core.account import TYPE as ACCOUNT_TYPE
 
 from .common import (
     BalanceType,
-    BALANCE_TYPE_MAPPINGS,
     BalanceExtendedError,
-    BalanceExtended,
-    BalanceTypeConfig,
+    build_account_currencies_mapping,
+    build_account_type_mapping,
+    get_directives_defined_config,
+    is_balance_ext_config,
     parse_balance_extended_entry,
 )
 
@@ -48,6 +47,23 @@ __plugins__ = ["balance_extended"]
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
+
+
+def _extract_balance_ext_account(entry) -> str | None:
+    if not (isinstance(entry, data.Custom) and entry.type == "balance-ext"):
+        return None
+    values = entry.values or []
+    if not values:
+        return None
+    account_index = 0
+    if isinstance(values[0].value, str):
+        candidate = values[0].value
+        if candidate in BALANCE_TYPE_MAPPINGS or candidate in BALANCE_TYPE_MAPPINGS.values():
+            account_index = 1
+    if len(values) <= account_index:
+        return None
+    account = values[account_index].value
+    return account if isinstance(account, str) else None
 
 
 def balance_extended(entries, options_map, config_str=None):
@@ -82,6 +98,19 @@ def balance_extended(entries, options_map, config_str=None):
     if errors:
         return entries, errors
 
+    default_balance_type = config.get("default_balance_type", BalanceType.REGULAR.value)
+    balance_ext_accounts = [
+        account
+        for entry in entries
+        for account in [(_extract_balance_ext_account(entry))]
+        if account is not None and not is_balance_ext_config(entry)
+    ]
+    account_to_type_mapping = build_account_type_mapping(
+        balance_ext_accounts,
+        balance_type_config,
+        default_balance_type,
+    )
+
     # Track Pad directives (both pre-existing and created by this plugin run) so we don't
     # emit duplicates for the same (date, account, source_account).
     existing_pad_keys: set[PadKey] = set()
@@ -100,9 +129,12 @@ def balance_extended(entries, options_map, config_str=None):
 
     balance_extended_parsed_entries = {}
     for entry in entries:
-        if isinstance(entry, data.Custom) and entry.type == "balance-ext" and not _is_balance_ext_config(entry):
+        if isinstance(entry, data.Custom) and entry.type == "balance-ext" and not is_balance_ext_config(entry):
             try:
-                balance_extended_parsed_entries[id(entry)] = parse_balance_extended_entry(entry, config, balance_type_config)
+                balance_extended_parsed_entries[id(entry)] = parse_balance_extended_entry(
+                    entry,
+                    account_to_type_mapping,
+                )
             except BalanceExtendedError as exc:
                 errors.append(exc)
 
@@ -117,7 +149,7 @@ def balance_extended(entries, options_map, config_str=None):
 
     for entry in entries:
         if isinstance(entry, data.Custom):
-            if entry.type == "balance-ext" and not _is_balance_ext_config(entry):
+            if entry.type == "balance-ext" and not is_balance_ext_config(entry):
                 if not id(entry) in balance_extended_parsed_entries:
                     # already in errors, just skip here
                     continue
@@ -140,94 +172,6 @@ def balance_extended(entries, options_map, config_str=None):
             new_entries.append(entry)
     
     return new_entries, errors
-
-
-def build_account_currencies_mapping(entries):
-    """Build a mapping of account names to their declared currencies.
-    
-    Args:
-      entries: A list of directives.
-    Returns:
-      A dictionary mapping account names to sets of currency strings.
-    """
-    account_currencies = {}
-    
-    for entry in entries:
-        if isinstance(entry, data.Open):
-            if entry.currencies:
-                account_currencies[entry.account] = set(entry.currencies)
-            else:
-                # If no currencies specified, use empty set
-                account_currencies[entry.account] = set()
-    
-    return account_currencies
-
-
-def _is_balance_ext_config(entry):
-    """Check if a Custom entry is a balance-ext config directive."""
-    return (
-        isinstance(entry, data.Custom)
-        and entry.type == "balance-ext"
-        and entry.values
-        and isinstance(entry.values[0].value, str)
-        and entry.values[0].value == "config"
-    )
-
-
-def get_directives_defined_config(entries, errors):
-    parsed_config = []
-    config_entries = [
-        entry
-        for entry in entries
-        if _is_balance_ext_config(entry)
-    ]
-    for entry in reversed(config_entries):
-        account_regex = entry.meta.get("account_regex")
-        if not account_regex:
-            errors.append(
-                BalanceExtendedError(
-                    entry.meta,
-                    "account_regex is required in balance-ext config entry",
-                    entry,
-                )
-            )
-            continue
-        try:
-            compiled_account_regex = re.compile(account_regex)
-        except re.error as exc:
-            errors.append(
-                BalanceExtendedError(
-                    entry.meta,
-                    f"Invalid account_regex: {exc}",
-                    entry,
-                )
-            )
-            continue
-        balance_type = entry.meta.get("balance_type")
-        if not isinstance(balance_type, str):
-            errors.append(
-                BalanceExtendedError(
-                    entry.meta,
-                    "balance_type is required in balance-ext config entry",
-                    entry,
-                )
-            )
-            continue
-        if balance_type in BALANCE_TYPE_MAPPINGS:
-            balance_type = BALANCE_TYPE_MAPPINGS[balance_type]
-        try:
-            BalanceType(balance_type)
-        except ValueError:
-            errors.append(
-                BalanceExtendedError(
-                    entry.meta,
-                    f"Invalid balance_type: {balance_type}. Must be 'full', 'padded', or 'full-padded'",
-                    entry,
-                )
-            )
-            continue
-        parsed_config.append(BalanceTypeConfig(compiled_account_regex, balance_type))
-    return parsed_config
 
 
 def get_pad_and_prev_balance_date(date, balance_dates, config):
@@ -273,7 +217,7 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
             meta=custom_entry.meta.copy(),
             date=custom_entry.date,
             type="valuation",
-            values=[ValueType(account, dtype=ACCOUNT_TYPE), amount_values[0]],
+            values=[ValueType(account, dtype=ACCOUNT_TYPE), ValueType(amount_values[0], dtype=amount.Amount)],
         ))
         return new_entries, errors
 
@@ -322,23 +266,7 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
     
     # Parse explicit currency amounts from the directive
     explicit_currencies = {}
-    
-    # Handle Amount objects (Beancount parses amounts as Amount objects)
-    for value_wrapper in amount_values:
-        amount_obj = value_wrapper.value
-        
-        # Allow to put just 0 to specify empty balance
-        if isinstance(amount_obj, Decimal) and amount_obj == 0:
-            continue
-        # Otherwise verify it's an Amount object
-        if not isinstance(amount_obj, amount.Amount):
-            errors.append(BalanceExtendedError(
-                custom_entry.meta,
-                f"Expected Amount object, got {type(amount_obj)}: {amount_obj}",
-                custom_entry
-            ))
-            continue
-        
+    for amount_obj in amount_values:
         explicit_currencies[amount_obj.currency] = amount_obj.number
     
     # Determine which currencies to create balance assertions for

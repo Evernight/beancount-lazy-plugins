@@ -222,14 +222,14 @@ class TestBalanceExtended(unittest.TestCase):
         self.assertIn("[balance_type] account amount1", errors[0].message)
 
     def test_balance_full_invalid_amount_object(self):
-        """Test full type balance with invalid amount object."""
+        """Test full type balance with invalid amount object rejects the whole entry."""
         ledger = """
         2015-01-01 custom "balance-ext" "full" Assets:Checking 100 USD 200
         """
         entries, options_map = self.load_from_string(ledger)
         new_entries, errors = balance_extended(entries, options_map)
 
-        self.assertEqual(len(new_entries), 1)  # First amount should work
+        self.assertEqual(len(new_entries), 0)  # Entire entry rejected
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], BalanceExtendedError)
         self.assertIn("Expected Amount object", errors[0].message)
