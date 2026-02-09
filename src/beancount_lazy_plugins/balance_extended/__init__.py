@@ -36,7 +36,6 @@ from .common import (
     BalanceType,
     BalanceExtendedError,
     build_account_currencies_mapping,
-    build_account_type_mapping,
     get_directives_defined_config,
     is_balance_ext_config,
     parse_balance_extended_entry,
@@ -47,23 +46,6 @@ __plugins__ = ["balance_extended"]
 class PadKey(NamedTuple):
     date: datetime.date
     account: str
-
-
-def _extract_balance_ext_account(entry) -> str | None:
-    if not (isinstance(entry, data.Custom) and entry.type == "balance-ext"):
-        return None
-    values = entry.values or []
-    if not values:
-        return None
-    account_index = 0
-    if isinstance(values[0].value, str):
-        candidate = values[0].value
-        if candidate in BALANCE_TYPE_MAPPINGS or candidate in BALANCE_TYPE_MAPPINGS.values():
-            account_index = 1
-    if len(values) <= account_index:
-        return None
-    account = values[account_index].value
-    return account if isinstance(account, str) else None
 
 
 def balance_extended(entries, options_map, config_str=None):
@@ -99,17 +81,7 @@ def balance_extended(entries, options_map, config_str=None):
         return entries, errors
 
     default_balance_type = config.get("default_balance_type", BalanceType.REGULAR.value)
-    balance_ext_accounts = [
-        account
-        for entry in entries
-        for account in [(_extract_balance_ext_account(entry))]
-        if account is not None and not is_balance_ext_config(entry)
-    ]
-    account_to_type_mapping = build_account_type_mapping(
-        balance_ext_accounts,
-        balance_type_config,
-        default_balance_type,
-    )
+    account_to_type_mapping: dict[str, str] = {}
 
     # Track Pad directives (both pre-existing and created by this plugin run) so we don't
     # emit duplicates for the same (date, account, source_account).
@@ -134,6 +106,8 @@ def balance_extended(entries, options_map, config_str=None):
                 balance_extended_parsed_entries[id(entry)] = parse_balance_extended_entry(
                     entry,
                     account_to_type_mapping,
+                    balance_type_config,
+                    default_balance_type,
                 )
             except BalanceExtendedError as exc:
                 errors.append(exc)
