@@ -138,6 +138,9 @@ def balance_extended(entries, options_map, config_str=None):
                 )
                 new_entries.extend(balance_entries)
                 errors.extend(entry_errors)
+
+                # pass original entry as well
+                new_entries.append(entry)
             else:
                 # Keep config and other custom directives as-is
                 new_entries.append(entry)
@@ -185,10 +188,14 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
     balance_type = parsed_entry.balance_type
     amount_values = parsed_entry.amount_values
 
+    new_meta = custom_entry.meta.copy()
+    new_meta["filename"] = 'generated from ' + custom_entry.meta.get("filename")
+    new_meta["generated_by"] = 'balance_extended'
+
     # For valuation type, just add a valuation entry
     if balance_type == BalanceType.VALUATION:
         new_entries.append(data.Custom(
-            meta=custom_entry.meta.copy(),
+            meta=new_meta,
             date=custom_entry.date,
             type="valuation",
             values=[ValueType(account, dtype=ACCOUNT_TYPE), ValueType(amount_values[0], dtype=amount.Amount)],
@@ -204,7 +211,7 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
         pad_key = PadKey(pad_date, account)
         if pad_key not in existing_pad_keys:            
             pad_type = config.get('default_pad_type', 'pad-ext')
-            pad_meta = custom_entry.meta.copy()
+            pad_meta = new_meta
             pad_meta['end_balance_date'] = custom_entry.date.isoformat()
             pad_meta['start_balance_date'] = prev_balance_date.isoformat() if prev_balance_date else None
 
@@ -222,14 +229,14 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
                 # when Pad is used, pad_account must be set in the metadata
                 if not isinstance(pad_account, str):
                     errors.append(BalanceExtendedError(
-                        custom_entry.meta,
+                        new_meta,
                         "pad_account metadata must be set when 'default_pad_type' is 'pad'",
                         custom_entry,
                     ))
                     pad_entry = None
                 else:
                     pad_entry = data.Pad(
-                        meta=pad_meta,
+                        meta=new_meta,
                         date=pad_date,
                         account=account,
                         source_account=pad_account,
@@ -259,7 +266,7 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
         # Create a Balance directive
         balance_amount = amount.Amount(amount_value, currency)
         balance_entry = data.Balance(
-            meta=custom_entry.meta.copy(),
+            meta=new_meta,
             date=custom_entry.date,
             account=account,
             amount=balance_amount,
