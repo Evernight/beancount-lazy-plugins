@@ -32,6 +32,7 @@ class RegexToPadAccountMapping:
     pad_account: str | None = None
     pad_account_expenses: str | None = None
     pad_account_income: str | None = None
+    pad_account_initial: str | None = None
 
 class PadError(NamedTuple):
     """Represents an error encountered during padding."""
@@ -51,46 +52,65 @@ def get_padded_account(pad_entry):
         return pad_entry.account
     return pad_entry.values[0].value
 
-def get_source_account(pad_entry, diff_position, default_pad_account_config, default_pad_acount_cache):
+def get_source_account(
+    pad_entry,
+    diff_position,
+    default_pad_account_config,
+    default_pad_acount_cache,
+    is_initial_balance=False,
+):
     """
     Get the source account for a pad entry in the following order of precedence:
-    1. The account specified in the pad entry metadata (pad_account)
+    1. The account specified in the pad entry metadata (pad_account or pad_account_initial when is_initial_balance)
     2. The account specified in pad-ext-config statements of matching regex
-    2. The account specified in the default pad account configuration of matching regex
+    3. The account specified in the default pad account configuration of matching regex
+
+    pad_account_initial applies only when is_initial_balance is True (i.e. the pad is before
+    the first balance assertion for that account).
     """
     if type(pad_entry) == data.Pad:
         # Supports only direct specification of source account in Pad directive
         return pad_entry.source_account
 
-    # Otherwise going down the specificity chain
-    if pad_entry.meta.get('pad_account'):
-        return pad_entry.meta.get('pad_account')
-
     pad_entry_account = pad_entry.values[0].value
+    parts = pad_entry_account.split(":")
+    account_type = parts[0]
+    name = ":".join(parts[1:])
+
+    # Otherwise going down the specificity chain
+    if is_initial_balance and pad_entry.meta.get("pad_account_initial"):
+        return pad_entry.meta.get("pad_account_initial").format(
+            type=account_type, name=name
+        )
+    if pad_entry.meta.get("pad_account"):
+        return pad_entry.meta.get("pad_account")
 
     position_sign = math.copysign(1, diff_position.units.number)
-    key = (pad_entry_account, position_sign)
-    if key in default_pad_acount_cache:
-        return default_pad_acount_cache[key]
-
-    parts = pad_entry_account.split(':')
-    account_type = parts[0]
-    name = ':'.join(parts[1:])
+    cache_key = (pad_entry_account, position_sign, is_initial_balance)
+    if cache_key in default_pad_acount_cache:
+        return default_pad_acount_cache[cache_key]
 
     # default_pad_account_config is sorted in decreasing specificity order
-    for mapping in default_pad_account_config:        
+    for mapping in default_pad_account_config:
         if mapping.regex.match(pad_entry_account):
-            if mapping.pad_account_expenses and mapping.pad_account_income:
+            # Prefer pad_account_initial when applicable
+            if is_initial_balance and mapping.pad_account_initial:
+                res = mapping.pad_account_initial.format(type=account_type, name=name)
+            elif mapping.pad_account_expenses and mapping.pad_account_income:
                 if position_sign > 0:
                     res = mapping.pad_account_income.format(type=account_type, name=name)
                 else:
-                    res = mapping.pad_account_expenses.format(type=account_type, name=name)
+                    res = mapping.pad_account_expenses.format(
+                        type=account_type, name=name
+                    )
             elif mapping.pad_account:
                 res = mapping.pad_account.format(type=account_type, name=name)
             else:
-                raise ValueError(f"Invalid default pad account configuration: {mapping}")
+                raise ValueError(
+                    f"Invalid default pad account configuration: {mapping}"
+                )
 
-            default_pad_acount_cache[key] = res
+            default_pad_acount_cache[cache_key] = res
             return res
     return None
 
@@ -127,13 +147,23 @@ def get_directives_defined_config(entries, pad_errors):
         expenses_account = entry.meta.get("pad_account_expenses")
         income_account = entry.meta.get("pad_account_income")
         pad_account = entry.meta.get("pad_account")
+        pad_account_initial = entry.meta.get("pad_account_initial")
         if expenses_account and income_account:
             parsed_config.append(
-                RegexToPadAccountMapping(compiled_account_regex, pad_account_income=income_account, pad_account_expenses=expenses_account)
+                RegexToPadAccountMapping(
+                    compiled_account_regex,
+                    pad_account_income=income_account,
+                    pad_account_expenses=expenses_account,
+                    pad_account_initial=pad_account_initial,
+                )
             )
         elif pad_account:
             parsed_config.append(
-                RegexToPadAccountMapping(compiled_account_regex, pad_account=pad_account)
+                RegexToPadAccountMapping(
+                    compiled_account_regex,
+                    pad_account=pad_account,
+                    pad_account_initial=pad_account_initial,
+                )
             )
         else:
             pad_errors.append(
@@ -155,8 +185,17 @@ def parse_pad_account_item(item):
     pattern = re.compile(item[0])
     if len(item) == 2:
         return RegexToPadAccountMapping(pattern, pad_account=item[1])
-    elif len(item) >= 3:
-        return RegexToPadAccountMapping(pattern, pad_account_income=item[1], pad_account_expenses=item[2])
+    elif len(item) == 3:
+        return RegexToPadAccountMapping(
+            pattern, pad_account_income=item[1], pad_account_expenses=item[2]
+        )
+    else:  # len == 4
+        return RegexToPadAccountMapping(
+            pattern,
+            pad_account_income=item[1],
+            pad_account_expenses=item[2],
+            pad_account_initial=item[3],
+        )
 
 
 def pad_extended(entries, options_map, config_str=None):
@@ -225,6 +264,9 @@ def pad_extended(entries, options_map, config_str=None):
         # A set of currencies already padded so far in this account.
         padded_lots = set()
 
+        # Track if we've seen the first balance assertion for this account.
+        first_balance_seen = False
+
         pad_balance = inventory.Inventory()
         for entry in postings:
             assert not isinstance(entry, data.Posting)
@@ -242,6 +284,9 @@ def pad_extended(entries, options_map, config_str=None):
                     padded_lots = set()
 
             elif isinstance(entry, data.Balance):
+                is_initial_balance = not first_balance_seen
+                first_balance_seen = True
+
                 check_amount = entry.amount
 
                 # Compare the current balance amount to the expected one from
@@ -319,8 +364,9 @@ def pad_extended(entries, options_map, config_str=None):
                         source_account = get_source_account(
                             active_pad,
                             diff_position,
-                            default_pad_account_config, 
-                            default_pad_acount_cache
+                            default_pad_account_config,
+                            default_pad_acount_cache,
+                            is_initial_balance=is_initial_balance,
                         )
 
                         neg_diff_position = -diff_position
