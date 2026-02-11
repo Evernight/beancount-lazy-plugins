@@ -35,7 +35,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 1)
+        self.assertEqual(len(new_entries), 2)  # 1 balance + 1 original balance-ext
 
         balance_entry = new_entries[0]
         self.assertIsInstance(balance_entry, data.Balance)
@@ -52,7 +52,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 2)
+        self.assertEqual(len(new_entries), 3)  # 2 balances + 1 original balance-ext
 
         # Check first balance entry (EUR)
         balance_entry_1 = new_entries[0]
@@ -78,7 +78,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 2)
+        self.assertEqual(len(new_entries), 3)  # 1 pad + 1 balance + 1 original balance-ext
 
         # Check pad entry
         pad_entry = new_entries[0]
@@ -109,7 +109,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 5)  # open + config + pad + 2 balances
+        self.assertEqual(len(new_entries), 6)  # open + config + pad + 2 balances + original balance-ext
 
         self.assertEqual(new_entries[0], entries[0])  # open preserved
         self.assertEqual(new_entries[1], entries[1])  # config preserved
@@ -184,7 +184,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 3)
+        self.assertEqual(len(new_entries), 4)  # 1 pad + 2 balances + 1 original balance-ext
 
         # Check pad entry
         pad_entry = new_entries[0]
@@ -272,19 +272,23 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 5)  # 1 open + 2 balance full + 1 pad + 1 balance padded
+        self.assertEqual(len(new_entries), 7)  # 1 open + 2 balance full + 1 original + 1 pad + 1 balance padded + 1 original
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
 
-        # Check balance full entries
+        # Check balance full entries (2) + original
         self.assertIsInstance(new_entries[1], data.Balance)
         self.assertIsInstance(new_entries[2], data.Balance)
+        self.assertEqual(new_entries[3].type, "balance-ext")  # first original
 
-        # Check balance padded entries (pad + balance)
-        self.assertIsInstance(new_entries[3], data.Custom)
-        self.assertEqual(new_entries[3].type, "pad-ext")
-        self.assertIsInstance(new_entries[4], data.Balance)
+        # Check balance padded entries (pad + balance) + originals
+        pad_entries = [e for e in new_entries if isinstance(e, data.Custom) and e.type == "pad-ext"]
+        balance_entries = [e for e in new_entries if isinstance(e, data.Balance)]
+        balance_ext_originals = [e for e in new_entries if isinstance(e, data.Custom) and e.type == "balance-ext"]
+        self.assertEqual(len(pad_entries), 1)
+        self.assertEqual(len(balance_entries), 3)  # 2 from full + 1 from padded
+        self.assertEqual(len(balance_ext_originals), 2)  # both originals passed through
 
     def test_balance_full_with_zero_currencies(self):
         """Test balance full creates zero balance assertions for missing currencies."""
@@ -296,7 +300,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 4)  # 1 open + 3 balance assertions
+        self.assertEqual(len(new_entries), 5)  # 1 open + 3 balance assertions + 1 original balance-ext
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
@@ -321,7 +325,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 3)  # 1 open + 1 pad + 1 balance assertion
+        self.assertEqual(len(new_entries), 4)  # 1 open + 1 pad + 1 balance assertion + 1 original balance-ext
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
@@ -347,7 +351,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 2)  # 2 balance assertions only
+        self.assertEqual(len(new_entries), 3)  # 2 balance assertions + 1 original balance-ext
 
         # Check balance assertions - should only create what's specified
         balance_assertions = [e for e in new_entries if isinstance(e, data.Balance)]
@@ -367,7 +371,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 2)  # 1 open + 1 balance assertion
+        self.assertEqual(len(new_entries), 3)  # 1 open + 1 balance assertion + 1 original balance-ext
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
@@ -482,7 +486,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 5)  # 1 open + 1 pad + 3 balance assertions
+        self.assertEqual(len(new_entries), 6)  # 1 open + 1 pad + 3 balance assertions + 1 original balance-ext
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
@@ -515,7 +519,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 6)  # 1 open + 1 pad + 4 balance assertions
+        self.assertEqual(len(new_entries), 7)  # 1 open + 1 pad + 4 balance assertions + 1 original balance-ext
 
         # Check that open entry is preserved
         self.assertEqual(new_entries[0], entries[0])
@@ -548,7 +552,7 @@ class TestBalanceExtended(unittest.TestCase):
         new_entries, errors = balance_extended(entries, options_map)
 
         self.assertEqual(len(errors), 0)
-        self.assertEqual(len(new_entries), 3)  # 1 pad + 2 balance assertions only
+        self.assertEqual(len(new_entries), 4)  # 1 pad + 2 balance assertions + 1 original balance-ext
 
         # Check pad entry
         pad_entry = new_entries[0]
