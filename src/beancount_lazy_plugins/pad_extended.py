@@ -42,10 +42,23 @@ class PadError(NamedTuple):
     entry: data.Pad
 
 
+def is_pad_config_entry(entry):
+    """True if entry is a pad-ext config directive (not a pad operation)."""
+    if not isinstance(entry, data.Custom):
+        return False
+    # New format: custom "pad-ext" "config"
+    if entry.type == "pad-ext" and entry.values and entry.values[0].value == "config":
+        return True
+    return False
+
+
 def is_pad_entry(entry, config):
     if isinstance(entry, data.Pad):
         return config.get('handle_default_pad_directives', False)
-    return isinstance(entry, data.Custom) and entry.type == "pad-ext"
+    if not isinstance(entry, data.Custom) or entry.type != "pad-ext":
+        return False
+    # Exclude config entries: custom "pad-ext" "config"
+    return not (entry.values and entry.values[0].value == "config")
 
 def get_padded_account(pad_entry):
     if type(pad_entry) == data.Pad:
@@ -62,7 +75,7 @@ def get_source_account(
     """
     Get the source account for a pad entry in the following order of precedence:
     1. The account specified in the pad entry metadata (pad_account or pad_account_initial when is_initial_balance)
-    2. The account specified in pad-ext-config statements of matching regex
+    2. The account specified in pad-ext config statements of matching regex
     3. The account specified in the default pad account configuration of matching regex
 
     pad_account_initial applies only when is_initial_balance is True (i.e. the pad is before
@@ -119,7 +132,7 @@ def get_directives_defined_config(entries, pad_errors):
     pad_config_entries = [
         entry
         for entry in entries
-        if isinstance(entry, data.Custom) and entry.type == "pad-ext-config"
+        if is_pad_config_entry(entry)
     ]
     for entry in reversed(pad_config_entries):
         account_regex = entry.meta.get("account_regex")
@@ -169,7 +182,7 @@ def get_directives_defined_config(entries, pad_errors):
             pad_errors.append(
                 PadError(
                     entry.meta,
-                    "pad-ext-config requires account_regex and (pad_account or pad_account_expenses and pad_account_income)",
+                    "pad-ext config requires account_regex and (pad_account or pad_account_expenses and pad_account_income) metadata",
                     entry,
                 )
             )

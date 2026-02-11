@@ -414,7 +414,7 @@ By default it doesn't handle default Pad operations so you will need to use it a
 
 You can configure default pad account for a set of accounts specified by regular expression as below:
 ```
-2015-01-01 custom "pad-ext-config"
+2015-01-01 custom "pad-ext" "config"
   account_regex: "Assets:Bank:.*"
   pad_account: "Expenses:Unattributed:{name}"
 }
@@ -423,7 +423,7 @@ An account specified in ```pad_account``` will be used for all padded accounts m
 
 Since padding can be either positive or negative, you can alternatively specify different pad accounts for positive and negative padding by adding `pad_account_expenses` and `pad_account_income` metadata to the configuration entry:
 ```
-2015-01-01 custom "pad-ext-config"
+2015-01-01 custom "pad-ext" "config"
   account_regex: "Assets:Bank:.*"
   pad_account_expenses: "Expenses:Unattributed:{name}"
   pad_account_income: "Income:Unattributed:{name}"
