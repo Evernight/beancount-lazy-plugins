@@ -242,9 +242,16 @@ def valuation(entries, options_map, config_str=None):
 
         elif isinstance(entry, Balance) and entry.account in account_mapping:
             mapped_currency, pnl_account = account_mapping[entry.account]
-            assert entry.account not in balances, (
-                "a single balance statement should be before any valuation assertion"
-            )
+            if entry.account in balances:
+                exc = ValuationError(
+                    entry.meta,
+                    f"Only a single balance directive is allowed before any valuation directives for the account {entry.account}",
+                    entry,
+                )
+                plugin_errors.append(
+                    ValuationPluginError(exc.source, exc.message, exc.entry)
+                )
+                continue
 
             price = Price(
                 entry.meta,

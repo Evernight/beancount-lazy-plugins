@@ -189,7 +189,6 @@ def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad
     amount_values = parsed_entry.amount_values
 
     new_meta = custom_entry.meta.copy()
-    new_meta["filename"] = 'generated from ' + custom_entry.meta.get("filename")
     new_meta["generated_by"] = 'balance_extended'
 
     # For valuation type, just add a valuation entry
