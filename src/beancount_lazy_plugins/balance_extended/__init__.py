@@ -152,6 +152,11 @@ def balance_extended(entries, options_map, config_str=None):
 
 
 def get_pad_and_prev_balance_date(date, balance_dates, config):
+    """
+    Get the best pad date and the previous balance date.
+    The best pad date is the latest date that is after the previous balance date but before the current date.
+    If no preferred pad dates are configured, the previous day is returned.
+    """
     date_minus_one = date - datetime.timedelta(days=1)
     prev_balance_date = None
     index = bisect.bisect_right(balance_dates, date_minus_one)
@@ -162,12 +167,16 @@ def get_pad_and_prev_balance_date(date, balance_dates, config):
     if not preferred_pad_dates:
         return date_minus_one, prev_balance_date
 
-    for month in [date.month, date.month - 1]:
-        for preferred_date in reversed(sorted(preferred_pad_dates)):
-            candidate_date = datetime.date(date.year, month, preferred_date)
-            if candidate_date < date and candidate_date >= prev_balance_date:
-                return candidate_date, prev_balance_date
-    return date_minus_one, prev_balance_date
+    # find latest date that is after prev_balance_date but before the date
+    best_date = None
+    for candidate_month_date in [date, date - datetime.timedelta(days=31)]:
+        for preferred_date in preferred_pad_dates:
+            candidate_date = datetime.date(candidate_month_date.year, candidate_month_date.month, preferred_date)
+            if (prev_balance_date is None or candidate_date >= prev_balance_date) and candidate_date < date and (best_date is None or candidate_date > best_date):
+                best_date = candidate_date
+    if best_date is None:
+        best_date = date_minus_one
+    return best_date, prev_balance_date
 
 def process_balance(parsed_entry, custom_entry, account_currencies, existing_pad_keys, balance_dates_per_account, config):
     """Common logic for processing balance custom operations.
