@@ -1,7 +1,8 @@
 # beancount-lazy-plugins
 
-Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beancount). 
-They can also be installed and used on their own.
+Set of plugins used by [lazy-beancount](https://github.com/Evernight/lazy-beancount). Of course, they can also be installed and used on their own.
+
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## Installation
 
