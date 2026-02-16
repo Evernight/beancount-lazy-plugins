@@ -1,8 +1,6 @@
 # balance_extended
 
-_(Experimental, APIs might change slightly in the future)_
-
-A Beancount plugin that adds custom balance operations with a type parameter:
+A Beancount plugin that extends the idea of standard [balance](https://beancount.github.io/docs/beancount_language_syntax.html#balance-assertions) operation. It adds a new type of custom balance operation with a type parameter:
 
 - **full**: Expand a balance assertion into separate per-currency assertions. For currencies declared in the account's `open` directive but not listed in the custom, a zero balance assertion is generated.
 - **padded**: Creates a `pad` directive on day-1 from a specified pad account, and asserts only the currencies explicitly listed in the directive (does not expand to all declared currencies).
@@ -74,4 +72,4 @@ There's also an option to specify preferred pad dates in the config:
 ```
 
 These dates will be preferred instead of the previous day when generating pad entries, unless it crosses the previous balance entry for that account.
-This is useful when you want pad operations to appear on specific dates, for example for more consistent behaviour when using filters in Fava.
+This is useful when you want pad operations to appear on specific dates. For example, if you use Fava filters, it's easier to filter by full month (e.g. ```month```, ```month-1```, or ```2025-06```). Ideally pad operations shouldn't create big discrepancies, but if they do, it's better to spread these more evenly even if you miss a date to record balance using ```balance-ext``` and record if a few days later.
