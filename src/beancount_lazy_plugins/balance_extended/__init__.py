@@ -76,6 +76,20 @@ def balance_extended(entries, options_map, config_str=None):
             ))
             return entries, errors
 
+    default_pad_type = config.get("default_pad_type", "pad-ext")
+    if default_pad_type == "pad-ext":
+        plugin_names = [name for name, _ in options_map.get("plugin", [])]
+        if "beancount_lazy_plugins.pad_extended" not in plugin_names:
+            errors.append(BalanceExtendedError(
+                source=None,
+                message=(
+                    "default_pad_type is 'pad-ext' but beancount_lazy_plugins.pad_extended "
+                    "plugin is not enabled. Add plugin \"beancount_lazy_plugins.pad_extended\"."
+                ),
+                entry=None,
+            ))
+            return entries, errors
+
     balance_type_config = get_directives_defined_config(entries, errors)
     if errors:
         return entries, errors
