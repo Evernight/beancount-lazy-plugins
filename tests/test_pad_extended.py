@@ -23,7 +23,9 @@ class TestPadExtended(unittest.TestCase):
     def test_two_pads_same_account_initial_and_regular(self):
         """Test two pads for the same account: first uses pad_account_initial, second uses pad_account."""
         ledger = """
+        option "plugin_processing_mode" "raw"
         plugin "beancount_lazy_plugins.pad_extended"
+        plugin "beancount.ops.balance"
 
         2015-01-01 open Assets:Bank USD
         2015-01-01 open Equity:Opening-Balances USD
@@ -155,4 +157,45 @@ class TestPadExtended(unittest.TestCase):
         self.assertEqual(amounts["Assets:Bank"], Amount(D("50"), "USD"))
         self.assertEqual(
             amounts["Expenses:Unattributed:Bank"], Amount(D("-50"), "USD")
+        )
+
+    def test_requires_plugin_processing_mode_raw(self):
+        """Test that pad_extended errors when plugin_processing_mode is not raw."""
+        ledger = """
+        option "plugin_processing_mode" "default"
+        plugin "beancount_lazy_plugins.pad_extended"
+        plugin "beancount.ops.balance"
+
+        2015-01-01 open Assets:Bank USD
+        2015-01-01 custom "pad-ext" Assets:Bank
+        2015-01-02 balance Assets:Bank 0 USD
+        """
+        entries, errors, options_map = self.load_from_string(ledger)
+
+        self.assertGreater(len(errors), 0)
+        error_messages = [e.message for e in errors]
+        self.assertTrue(
+            any("plugin_processing_mode" in msg for msg in error_messages),
+            f"Expected plugin_processing_mode error, got: {error_messages}",
+        )
+
+    def test_rejects_beancount_ops_pad(self):
+        """Test that pad_extended errors when beancount.ops.pad is enabled."""
+        ledger = """
+        option "plugin_processing_mode" "raw"
+        plugin "beancount_lazy_plugins.pad_extended"
+        plugin "beancount.ops.pad"
+        plugin "beancount.ops.balance"
+
+        2015-01-01 open Assets:Bank USD
+        2015-01-01 custom "pad-ext" Assets:Bank
+        2015-01-02 balance Assets:Bank 0 USD
+        """
+        entries, errors, options_map = self.load_from_string(ledger)
+
+        self.assertGreater(len(errors), 0)
+        error_messages = [e.message for e in errors]
+        self.assertTrue(
+            any("beancount.ops.pad" in msg for msg in error_messages),
+            f"Expected beancount.ops.pad error, got: {error_messages}",
         )

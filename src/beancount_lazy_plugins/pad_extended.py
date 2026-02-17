@@ -239,6 +239,31 @@ def pad_extended(entries, options_map, config_str=None):
             ))
             return entries, pad_errors
 
+    # Require plugin_processing_mode "raw" so PLUGINS_POST (including beancount.ops.pad)
+    # is not auto-added, and ensure beancount.ops.pad is not explicitly enabled.
+    if options_map.get("plugin_processing_mode") != "raw":
+        pad_errors.append(PadError(
+            source=None,
+            message=(
+                "pad_extended requires option \"plugin_processing_mode\" \"raw\". "
+                "Add it to your ledger."
+            ),
+            entry=None,
+        ))
+        return entries, pad_errors
+
+    plugin_names = [name for name, _ in options_map.get("plugin", [])]
+    if "beancount.ops.pad" in plugin_names:
+        pad_errors.append(PadError(
+            source=None,
+            message=(
+                "pad_extended handles both pad and pad-ext; do not enable "
+                "beancount.ops.pad alongside it."
+            ),
+            entry=None,
+        ))
+        return entries, pad_errors
+
     default_pad_account_config = []
     # Reverse for convenient checking later
     for item in reversed(config.get('default_pad_account', DEFAULT_DEFAULT_PAD_ACCOUNT_CONFIG)):
