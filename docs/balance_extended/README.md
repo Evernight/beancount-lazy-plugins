@@ -9,10 +9,27 @@ A Beancount plugin that extends the idea of standard [balance](https://beancount
 
 ## Usage
 
-Enable the plugin in your ledger:
-
 ```
 plugin "beancount_lazy_plugins.balance_extended"
+```
+
+Note that if you're using ```padded``` type of balance checks, you will need to enable [pad_extended](../pad_extended/README.md) plugin as well and satisfy the other pre-requisites for it to work:
+
+```
+; To disable automatic beancount.ops.balance and beancount.ops.pad plugins
+option "plugin_processing_mode" "raw"
+
+; Should precede pad_extended plugin
+plugin "beancount_lazy_plugins.balance_extended"
+
+; valuation plugin: optionally, just if you're using valuation type of balance checks
+plugin "beancount_lazy_plugins.valuation"
+
+; pad_extended plugin
+plugin "beancount_lazy_plugins.pad_extended"
+
+; Keep balance assertions in place in the end of the file
+plugin "beancount.ops.balance"
 ```
 
 The balance check with `balance-ext` looks like this:
