@@ -1,6 +1,6 @@
 # pad_extended
 
-A Beancount plugin that extends standard pad operation.
+A Beancount plugin that extends standard pad operation by replacing it with `pad-ext` custom directives with configurable default options. Differences from standard pad operation:
 
 1. Pad operation does not generate errors on unused pad entries by default (configurable with `generate_errors_on_unused_pad_entries` option)
 2. Specifying pad account is not required. You can configure default pad account for a set of accounts specified by regular expression.
@@ -8,20 +8,23 @@ A Beancount plugin that extends standard pad operation.
 4. You can still override / specify the pad account explicitly by adding `pad_account` metadata to the pad entry.
 
 ## Usage
-
-Enable the plugin in your ledger:
+The plugin handles both standard `pad` directives and `pad-ext` custom directives, so it replaces `beancount.ops.pad` (do not enable both). Note that to disable automatic ```beancount.ops.pad``` and ```beancount.ops.balance```, you need to set ```option "plugin_processing_mode" "raw"``` option in the beginning of the ledger, like so:
 
 ```
+option "plugin_processing_mode" "raw"
+
 plugin "beancount_lazy_plugins.pad_extended" "{
     'default_pad_account': [
         ('.*', 'Expenses:Unreconciled:{name}'),
     ],
     'generate_errors_on_unused_pad_entries': False,
-    'handle_default_pad_directives': False,
 }
+
+; Keep balance assertions in place
+plugin "beancount.ops.balance"
 ```
 
-Then use it like you would use a pad operation normally
+Then use it like you would use a pad operation normally:
 
 ```
 2015-01-01 custom "pad-ext" Assets:Bank:Savings
@@ -29,8 +32,6 @@ Then use it like you would use a pad operation normally
 ```
 
 (or use `balance-ext` with `padded` balance type from [balance_extended](../balance_extended/README.md) plugin).
-
-By default the plugin doesn't handle default Pad operations so you will need to use it alongside `beancount.ops.pad` plugin. If you want it to process default Pad operations as well, set `handle_default_pad_directives` option to True.
 
 You can configure default pad account for a set of accounts specified by regular expression as below:
 

@@ -87,3 +87,72 @@ class TestPadExtended(unittest.TestCase):
         amounts = {p.account: p.units for p in txn2.postings}
         self.assertEqual(amounts["Assets:Bank"], Amount(D("50"), "USD"))
         self.assertEqual(amounts["Expenses:Unreconciled"], Amount(D("-50"), "USD"))
+
+    def test_pad_and_pad_ext_both_handled(self):
+        """Test pad_extended handles both standard Pad and pad-ext: pad, balance,
+        pad-ext, balance. First balance uses Pad (source_account), second uses pad-ext
+        (default config).
+        """
+        ledger = """
+        option "plugin_processing_mode" "raw"
+        plugin "beancount_lazy_plugins.pad_extended"
+        plugin "beancount.ops.balance"
+
+        2015-01-01 open Assets:Bank USD
+        2015-01-01 open Equity:Opening-Balances USD
+        2015-01-01 open Expenses:Unattributed USD
+        2015-01-01 open Expenses:Unattributed:Bank USD
+
+        2015-01-01 pad Assets:Bank Equity:Opening-Balances
+        2015-01-02 balance Assets:Bank 100 USD
+        2015-01-03 custom "pad-ext" Assets:Bank
+        2015-01-04 balance Assets:Bank 150 USD
+        """
+        entries, errors, options_map = self.load_from_string(ledger)
+
+        self.assertEqual(len(errors), 0, f"Unexpected errors: {errors}")
+
+        padding_txns = [
+            e
+            for e in entries
+            if isinstance(e, data.Transaction) and e.flag == flags.FLAG_PADDING
+        ]
+        self.assertEqual(
+            len(padding_txns),
+            2,
+            f"Expected 2 padding transactions, got {len(padding_txns)}",
+        )
+
+        # First padding: 100 USD from Pad directive, source Equity:Opening-Balances
+        txn1 = padding_txns[0]
+        self.assertEqual(txn1.date, datetime.date(2015, 1, 1))
+        source_accounts = [
+            p.account for p in txn1.postings if p.account != "Assets:Bank"
+        ]
+        self.assertEqual(
+            source_accounts,
+            ["Equity:Opening-Balances"],
+            "First balance should use Pad's source_account",
+        )
+        amounts = {p.account: p.units for p in txn1.postings}
+        self.assertEqual(amounts["Assets:Bank"], Amount(D("100"), "USD"))
+        self.assertEqual(
+            amounts["Equity:Opening-Balances"], Amount(D("-100"), "USD")
+        )
+
+        # Second padding: 50 USD from pad-ext, default Expenses:Unattributed:{name}
+        txn2 = padding_txns[1]
+        self.assertEqual(txn2.date, datetime.date(2015, 1, 3))
+        source_accounts = [
+            p.account for p in txn2.postings if p.account != "Assets:Bank"
+        ]
+        self.assertEqual(
+            source_accounts,
+            ["Expenses:Unattributed:Bank"],
+            "Second balance should use pad-ext default config",
+        )
+        amounts = {p.account: p.units for p in txn2.postings}
+        self.assertEqual(amounts["Assets:Bank"], Amount(D("50"), "USD"))
+        self.assertEqual(
+            amounts["Expenses:Unattributed:Bank"], Amount(D("-50"), "USD")
+        )

@@ -54,7 +54,7 @@ def is_pad_config_entry(entry):
 
 def is_pad_entry(entry, config):
     if isinstance(entry, data.Pad):
-        return config.get('handle_default_pad_directives', False)
+        return True
     if not isinstance(entry, data.Custom) or entry.type != "pad-ext":
         return False
     # Exclude config entries: custom "pad-ext" "config"
