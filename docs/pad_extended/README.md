@@ -52,7 +52,7 @@ Since padding can be either positive or negative, you can alternatively specify 
   pad_account_income: "Income:Unreconciled:{name}"
 ```
 
-This will avoid negative expense or positive income postings in the generated pad transactions.
+This will avoid negative expense or positive income postings in the generated pad transactions. However, if you're regularly dealing with multiple currencies and don't want to be having to be very precise with all the conversions, I would recommend to keep only ```Expenses``` pad account and use ```group_pad_transactions``` plugin to group pad transactions. This way a pad that has both -100 EUR and 120 USD postings will be close to 0 when conerted to a single currency and will not demand your attention.
 
 The later configuration directive appears in the file, the more priority it will have for mapping in case account name matches multiple regular expressions. A pad account specified directly on the `pad-ext` entry `pad_account` metadata has the highest priority.
 
