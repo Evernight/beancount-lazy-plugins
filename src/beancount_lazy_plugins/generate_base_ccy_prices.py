@@ -31,8 +31,16 @@ def generate(entries, options_map, baseCcy):
 
             priceInBaseCcy = amount.Amount(entry.amount.number * fxRate[1], baseCcy)
 
+            currencies_chain = f"{entry.currency} -> {entry.amount.currency} -> {baseCcy}"
+            meta = dict(entry.meta) if entry.meta else {}
+            plugin_part = f"generate_base_ccy_prices({currencies_chain})"
+            if meta.get("generated_by"):
+                meta["generated_by"] = meta["generated_by"] + " -> " + plugin_part
+            else:
+                meta["generated_by"] = plugin_part
+
             additionalEntries.append(
-                data.Price(entry.meta, entry.date, entry.currency, priceInBaseCcy)
+                data.Price(meta, entry.date, entry.currency, priceInBaseCcy)
             )
 
             existingDates[pair].add(entry.date)

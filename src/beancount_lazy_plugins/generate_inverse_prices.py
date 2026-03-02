@@ -43,8 +43,14 @@ def generate(entries, options_map):
             inverseRate = Decimal(1) / entry.amount.number
             inverseAmount = amount.Amount(inverseRate, entry.currency)
 
+            meta = dict(entry.meta) if entry.meta else {}
+            if meta.get("generated_by"):
+                meta["generated_by"] = meta["generated_by"] + " -> generate_inverse_prices"
+            else:
+                meta["generated_by"] = "generate_inverse_prices"
+
             additionalEntries.append(
-                data.Price(entry.meta, entry.date, entry.amount.currency, inverseAmount)
+                data.Price(meta, entry.date, entry.amount.currency, inverseAmount)
             )
 
             # Track the new entry to avoid duplicates within the same run
