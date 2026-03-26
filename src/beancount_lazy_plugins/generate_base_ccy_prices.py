@@ -24,6 +24,8 @@ def generate(entries, options_map, baseCcy):
                 continue
 
             pair = (entry.currency, baseCcy)
+            if entry.currency == baseCcy:
+                continue
             if pair not in existingDates:
                 existingDates[pair] = set([item[0] for item in priceMap.get(pair, [])])
             if entry.date in existingDates[pair]:
