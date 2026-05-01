@@ -47,9 +47,12 @@ def auto_insert_open(entries, options_map, config_str=None):
         if account not in opened_accounts:
             meta = data.new_metadata("<auto_accounts>", index)
             meta['auto_accounts'] = True
+            is_ignored = bool(ignored_regex and re.match(ignored_regex, account))
+            if is_ignored:
+                meta['auto_accounts_ignored'] = True
             new_entries.append(data.Open(meta, date_first_used, account, None, None))
 
-            if not (ignored_regex and re.match(ignored_regex, account)):
+            if not is_ignored:
                 auto_inserted_accounts.append(account)
 
     # Create warnings for auto-inserted accounts
