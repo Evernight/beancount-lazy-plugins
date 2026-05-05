@@ -9,6 +9,7 @@ __license__ = "GNU GPLv2"
 
 import ast
 import collections
+import datetime
 import re
 from beancount.core import data
 from beancount.core import getters
@@ -38,6 +39,10 @@ def auto_insert_open(entries, options_map, config_str=None):
 
     config = ast.literal_eval(config_str or "{}")
     ignored_regex = config.get("ignore_regex", None)
+    fixed_open_date_str = config.get("fixed_open_date", None)
+    fixed_open_date = (
+        datetime.date.fromisoformat(fixed_open_date_str) if fixed_open_date_str else None
+    )
 
     errors = []
     new_entries = []
@@ -47,10 +52,11 @@ def auto_insert_open(entries, options_map, config_str=None):
         if account not in opened_accounts:
             meta = data.new_metadata("<auto_accounts>", index)
             meta['auto_accounts'] = True
+            open_date = fixed_open_date if fixed_open_date is not None else date_first_used
             is_ignored = bool(ignored_regex and re.match(ignored_regex, account))
             if is_ignored:
                 meta['auto_accounts_ignored'] = True
-            new_entries.append(data.Open(meta, date_first_used, account, None, None))
+            new_entries.append(data.Open(meta, open_date, account, None, None))
 
             if not is_ignored:
                 auto_inserted_accounts.append(account)
