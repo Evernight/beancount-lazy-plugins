@@ -9,8 +9,10 @@ price map).
 
 import collections
 from decimal import Decimal
-from beancount.core import data, prices
+
+from beancount.core import display_context, prices
 from beancount.core.data import Amount, Posting, Transaction
+from beancount.core.display_context import Precision
 
 __plugins__ = ["currency_convert"]
 
@@ -20,6 +22,23 @@ CurrencyConvertError = collections.namedtuple(
 
 CONVERT_TO_METADATA_KEY = "convert_to"
 AT_TODAY_PRICE_METADATA_KEY = "at_today_price_in"
+
+
+def _get_dcontext(options_map):
+    """Return DisplayContext from options (set by the parser during load)."""
+    dcontext = options_map.get("dcontext")
+    if dcontext is not None:
+        return dcontext
+    dcontext = display_context.DisplayContext()
+    for currency, example_number in options_map.get("display_precision", {}).items():
+        num_tuple = example_number.as_tuple()
+        dcontext.set_fixed_precision(currency, -num_tuple.exponent)
+    return dcontext
+
+
+def _quantize_units(dcontext, number, currency):
+    return dcontext.quantize(number, currency, Precision.MOST_COMMON)
+
 
 def currency_convert(entries, options_map, config_str=None):
     """Convert postings based on convert_to metadata.
@@ -36,7 +55,8 @@ def currency_convert(entries, options_map, config_str=None):
     
     # Build the price map from all entries
     price_map = prices.build_price_map(entries)
-    
+    dcontext = _get_dcontext(options_map)
+
     for entry in entries:
         if isinstance(entry, Transaction):
             transaction_modified = False
@@ -78,52 +98,28 @@ def currency_convert(entries, options_map, config_str=None):
                                 ))
                                 new_postings.append(posting)
                             else:
-                                # Use inverse rate
                                 exchange_rate = Decimal(1) / inverse_price_info[1]
-                                converted_amount = posting.units.number * exchange_rate
-                                # Set per-unit price in terms of the original currency so that
-                                # converted amount can be traced back to the source currency.
-                                new_price = Amount(Decimal(1) / exchange_rate, source_currency)
-                                
-                                # Create new posting with converted amount and updated metadata
-                                new_meta = dict(posting.meta) if posting.meta else {}
-                                new_meta.pop(CONVERT_TO_METADATA_KEY, None)
-                                # Add converted_from metadata with original amount and currency
-                                new_meta['converted_from'] = f"{posting.units.number} {source_currency}"
-                                
-                                new_posting = Posting(
-                                    account=posting.account,
-                                    units=Amount(converted_amount, target_currency),
-                                    cost=posting.cost,
-                                    price=new_price,
-                                    flag=posting.flag,
-                                    meta=new_meta if new_meta else None
+                                new_postings.append(
+                                    _posting_with_converted_units(
+                                        dcontext,
+                                        posting,
+                                        source_currency,
+                                        target_currency,
+                                        exchange_rate,
+                                    )
                                 )
-                                new_postings.append(new_posting)
                                 transaction_modified = True
                         else:
-                            # Use direct rate
                             exchange_rate = price_info[1]
-                            converted_amount = posting.units.number * exchange_rate
-                            # Set per-unit price in terms of the original currency so that
-                            # converted amount can be traced back to the source currency.
-                            new_price = Amount(Decimal(1) / exchange_rate, source_currency)
-                            
-                            # Create new posting with converted amount and updated metadata
-                            new_meta = dict(posting.meta) if posting.meta else {}
-                            new_meta.pop(CONVERT_TO_METADATA_KEY, None)
-                            # Add converted_from metadata with original amount and currency
-                            new_meta['converted_from'] = f"{posting.units.number} {source_currency}"
-                            
-                            new_posting = Posting(
-                                account=posting.account,
-                                units=Amount(converted_amount, target_currency),
-                                cost=posting.cost,
-                                price=new_price,
-                                flag=posting.flag,
-                                meta=new_meta if new_meta else None
+                            new_postings.append(
+                                _posting_with_converted_units(
+                                    dcontext,
+                                    posting,
+                                    source_currency,
+                                    target_currency,
+                                    exchange_rate,
+                                )
                             )
-                            new_postings.append(new_posting)
                             transaction_modified = True
                 elif at_today_price and posting.units:
                     source_currency = posting.units.currency
@@ -152,35 +148,24 @@ def currency_convert(entries, options_map, config_str=None):
                                 ))
                                 new_postings.append(posting)
                             else:
-                                # Use inverse
                                 exchange_rate = Decimal(1) / inverse_price_info[1]
-                                new_price = Amount(exchange_rate, target_currency)
-                                new_meta = dict(posting.meta) if posting.meta else {}
-                                new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
-                                new_posting = Posting(
-                                    account=posting.account,
-                                    units=posting.units,
-                                    cost=posting.cost,
-                                    price=new_price,
-                                    flag=posting.flag,
-                                    meta=new_meta if new_meta else None
+                                new_postings.append(
+                                    _posting_with_at_today_price(
+                                        posting,
+                                        target_currency,
+                                        exchange_rate,
+                                    )
                                 )
-                                new_postings.append(new_posting)
                                 transaction_modified = True
                         else:
                             exchange_rate = price_info[1]
-                            new_price = Amount(exchange_rate, target_currency)
-                            new_meta = dict(posting.meta) if posting.meta else {}
-                            new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
-                            new_posting = Posting(
-                                account=posting.account,
-                                units=posting.units,
-                                cost=posting.cost,
-                                price=new_price,
-                                flag=posting.flag,
-                                meta=new_meta if new_meta else None
+                            new_postings.append(
+                                _posting_with_at_today_price(
+                                    posting,
+                                    target_currency,
+                                    exchange_rate,
+                                )
                             )
-                            new_postings.append(new_posting)
                             transaction_modified = True
                 else:
                     # No conversion or pricing needed, keep original posting
@@ -207,3 +192,39 @@ def currency_convert(entries, options_map, config_str=None):
             new_entries.append(entry)
     
     return new_entries, errors
+
+
+def _posting_with_converted_units(
+    dcontext,
+    posting,
+    source_currency,
+    target_currency,
+    exchange_rate,
+):
+    converted_amount = _quantize_units(
+        dcontext, posting.units.number * exchange_rate, target_currency
+    )
+    new_meta = dict(posting.meta) if posting.meta else {}
+    new_meta.pop(CONVERT_TO_METADATA_KEY, None)
+    new_meta["converted_from"] = f"{posting.units.number} {source_currency}"
+    return Posting(
+        account=posting.account,
+        units=Amount(converted_amount, target_currency),
+        cost=posting.cost,
+        price=Amount(Decimal(1) / exchange_rate, source_currency),
+        flag=posting.flag,
+        meta=new_meta if new_meta else None,
+    )
+
+
+def _posting_with_at_today_price(posting, target_currency, exchange_rate):
+    new_meta = dict(posting.meta) if posting.meta else {}
+    new_meta.pop(AT_TODAY_PRICE_METADATA_KEY, None)
+    return Posting(
+        account=posting.account,
+        units=posting.units,
+        cost=posting.cost,
+        price=Amount(exchange_rate, target_currency),
+        flag=posting.flag,
+        meta=new_meta if new_meta else None,
+    )
