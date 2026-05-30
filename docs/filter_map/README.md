@@ -91,3 +91,13 @@ Let's consider example 3 again. For each trip you want to describe it's likely t
 ```
 
 When some of the auto-imported merchant names do not make sense or are displayed differently in different transactions or banks, you may map them to something more understandable for you and useful for search / grouping in Fava and dashboards.
+
+## Example 7: atm
+
+```
+2021-01-01 custom "filter-map" "apply"
+    filter: "any(account:'^Assets:Physical:Cash$') any(account:'^Assets:(?!Physical:)[^:]+:Cash$')"
+    addTags: "#atm"
+```
+
+A simple snippet to mark all transactions that seem like ATM transactions (have both Physical:Cash and a non-Physical:Cash account postings).
