@@ -12,14 +12,16 @@ Configuration is provided via a Custom directive:
       tags: "location-{value}"
 
 The "tags" field may contain multiple space-separated tag templates. Each template may
-use "{value}" which will be replaced with the event value. The resulting tags are
-added without the leading "#".
+use "{value}" which will be replaced with the event value (spaces removed; characters
+such as ":" and "," replaced with "-"). The resulting tags are added without the
+leading "#".
 """
 
 from __future__ import annotations
 
 import collections
 import dataclasses
+import re
 from bisect import bisect_right
 from typing import Any, Iterable, Optional
 
@@ -168,6 +170,14 @@ def _build_event_timeline(
     return dict(timeline)
 
 
+_TAG_VALUE_SPECIALS = re.compile(r"[:,;|/\\]+")
+
+
+def _normalize_event_value(value: str) -> str:
+    value = re.sub(r"\s+", "", value)
+    return _TAG_VALUE_SPECIALS.sub("-", value)
+
+
 def _value_at(
     changes: list[tuple[data.datetime.date, str]], on_date: data.datetime.date
 ) -> Optional[str]:
@@ -229,9 +239,10 @@ def tag_from_continuous_events(entries, options_map, config_str=None):
             changes = timeline.get(cfg.event_name)
             if not changes:
                 continue
-            value = _value_at(changes, entry.date)
-            if value is None:
+            raw_value = _value_at(changes, entry.date)
+            if raw_value is None:
                 continue
+            value = _normalize_event_value(raw_value)
 
             for tmpl in cfg.tag_templates:
                 try:
