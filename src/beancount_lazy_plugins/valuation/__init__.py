@@ -13,6 +13,7 @@ import decimal
 from decimal import Decimal
 import sys
 
+from beancount.core import data
 from beancount.core.data import (
     Amount,
     Balance,
@@ -101,11 +102,18 @@ def valuation(entries, options_map, config_str=None):
     for entry in entries:
         if isinstance(entry, Open) and entry.account in account_mapping:
             open_account_entries[entry.account] = entry
-    for account in account_mapping.keys():
+    for index, account in enumerate(account_mapping.keys()):
         if account not in open_account_entries:
             config_entry = account_config_entries[account]
+            config_meta = config_entry.meta
+            filename = config_meta.get("filename", "<valuation>")
+            lineno = config_meta.get("lineno", index)
+            if not isinstance(lineno, int):
+                lineno = index
+            meta = data.new_metadata(filename, lineno)
+            meta["generated_by"] = "valuation"
             open_entry = Open(
-                {},
+                meta,
                 config_entry.date,
                 account,
                 [account_mapping[account].currency],

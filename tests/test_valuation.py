@@ -159,4 +159,5 @@ option "operating_currency" "USD"
     assert open_entry is not None, "Expected an Open entry for Assets:CoolFund:Total to be created"
     assert open_entry.currencies == ["COOL_FUND_USD"]
     assert open_entry.booking == Booking.FIFO
-    
+    assert isinstance(open_entry.meta.get("lineno"), int)
+    assert open_entry.meta.get("generated_by") == "valuation"
