@@ -1,6 +1,6 @@
 # tag_from_continuous_events
 
-A Beancount plugin that automatically applies tags to continuous events. Description of the event directive from the [official documentation](https://beancount.github.io/docs/beancount_language_syntax.html#events).
+A Beancount plugin that automatically applies tags to continuous events. Description of the event directive from the [official documentation](https://beancount.github.io/docs/beancount_language_syntax/#events).
 The plugin will go through the transactions in the ledger and apply tags accordingly to the value of the event at the date of the transaction.
 
 ## Usage

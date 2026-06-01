@@ -1,6 +1,6 @@
 # balance_extended
 
-A Beancount plugin that extends the idea of standard [balance](https://beancount.github.io/docs/beancount_language_syntax.html#balance-assertions) operation. It adds a new type of custom balance operation with a type parameter:
+A Beancount plugin that extends the idea of standard [balance](https://beancount.github.io/docs/beancount_language_syntax/#balance-assertions) operation. It adds a new type of custom balance operation with a type parameter:
 
 - **full**: Expand a balance assertion into separate per-currency assertions. For currencies declared in the account's `open` directive but not listed in the custom, a zero balance assertion is generated.
 - **padded**: Creates a `pad` directive on day-1 from a specified pad account, and asserts only the currencies explicitly listed in the directive (does not expand to all declared currencies).
